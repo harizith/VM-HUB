@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { v4 as uuidv4 } from "crypto";
 
 // GET /api/admin/departments - Fetch departments
 export async function GET() {
