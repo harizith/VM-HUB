@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  FACULTY
+  HOD
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  vmNo      String?  @unique // Real VM NO (e.g. 17433, EMP-CSE-001)
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(STUDENT)
+  status    String   @default("ACTIVE") // ACTIVE, SUSPENDED, PENDING
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studentProfile StudentProfile?
+  facultyProfile FacultyProfile?
+}
+
+model UserMode {
+  vmno      String   @id
+  emailid   String   @unique
+  password  String
+  usermode  String
+  createdAt DateTime @default(now())
+}
+
+model StudentProfile {
+  userEmail   String   @id
+  user        User     @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  rollNumber  String   @unique
+  department  String
+  semester    Int      @default(1)
+  batch       String   @default("2023-2027")
+  createdAt   DateTime @default(now())
+}
+
+model FacultyProfile {
+  vmNo        String   @id
+  user        User     @relation(fields: [vmNo], references: [vmNo], onDelete: Cascade)
+  department  String
+  designation String   @default("Assistant Professor")
+  createdAt   DateTime @default(now())
+}
+
+model Department {
+  vmNo      String   @id // VM NO primary key for Department
+  code      String   @unique // e.g. CSE, ECE, MECH
+  name      String   // e.g. Computer Science and Engineering
+  hodName   String?  
+  createdAt DateTime @default(now())
+}
+
+model Subject {
+  code           String   @id // Subject code as primary key
+  name           String   // e.g. Computer Networks
+  credits        Int      @default(3)
+  semester       Int      @default(5)
+  departmentCode String   @default("CSE")
+  createdAt      DateTime @default(now())
+}
+
+model Notice {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  category  String   @default("GENERAL") // GENERAL, URGENT, EXAM
+  postedBy  String   @default("Admin")
+  createdAt DateTime @default(now())
+}
+
+
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
