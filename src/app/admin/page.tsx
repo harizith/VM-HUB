@@ -26,11 +26,22 @@ interface UserItem {
 interface DeptItem { id: string; code: string; name: string; hodName?: string; }
 interface SubjectItem { id: string; code: string; name: string; credits: number; semester: number; departmentCode: string; }
 interface NoticeItem { id: string; title: string; content: string; category: string; postedBy: string; createdAt: string; }
+interface TimetableEntry {
+  id?: string;
+  classId?: string;
+  dayOrder: string;
+  period: number;
+  timeRange: string;
+  subjectCode: string;
+  subjectName: string;
+  facultyName: string;
+  roomNo: string;
+}
 
 
 export default function AdminPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "notices">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "notices" | "timetable">("users");
 
   // Role Subdivision Filter State
   const [userRoleSubdivision, setUserRoleSubdivision] = useState<"ALL" | "STUDENT" | "FACULTY" | "HOD" | "ADMIN">("ALL");
@@ -45,6 +56,14 @@ export default function AdminPage() {
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Timetable State
+  const [selectedDept, setSelectedDept] = useState("CSE");
+  const [selectedYear, setSelectedYear] = useState("II");
+  const [selectedSection, setSelectedSection] = useState("A");
+  const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
+  const [isEditingTimetable, setIsEditingTimetable] = useState(false);
+  const [loadingTimetable, setLoadingTimetable] = useState(false);
 
   // Modals State
   const [showUserModal, setShowUserModal] = useState(false);
@@ -209,6 +228,7 @@ export default function AdminPage() {
               { id: "depts", label: "🏛️ Departments", count: depts.length },
               { id: "subjects", label: "📚 Course Catalog", count: subjects.length },
               { id: "notices", label: "📢 Announcements", count: notices.length },
+              { id: "timetable", label: "📅 Timetables", count: 0 },
             ].map((nav) => (
               <button key={nav.id} onClick={() => { setActiveTab(nav.id as any); setSelectedUser(null); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "0.7rem 0.9rem", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "0.85rem", backgroundColor: activeTab === nav.id ? "var(--royal-blue)" : "transparent", color: activeTab === nav.id ? "#ffffff" : "var(--text-muted)", transition: "all 0.2s ease" }}>
                 <span>{nav.label}</span>
@@ -296,6 +316,7 @@ export default function AdminPage() {
               {activeTab === "depts" && "Academic Departments"}
               {activeTab === "subjects" && "Course & Subject Catalog"}
               {activeTab === "notices" && "System Announcements & Broadcasts"}
+              {activeTab === "timetable" && "Class Timetable Management"}
             </h1>
             <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
           </div>
@@ -532,6 +553,130 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* TIMETABLE */}
+            {activeTab === "timetable" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Class Timetable Management</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>View and modify schedules for specific classes</p>
+                  </div>
+                  {timetable.length > 0 && (
+                    <button onClick={async () => {
+                      if (isEditingTimetable) {
+                        setLoadingTimetable(true);
+                        const classId = `${selectedYear}${selectedDept}${selectedSection}`;
+                        const res = await fetch("/api/admin/timetable", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ classId, entries: timetable })
+                        }).then(r => r.json());
+                        if(res.success) { alert("Timetable updated!"); setIsEditingTimetable(false); }
+                        else { alert("Failed to update: " + res.error); }
+                        setLoadingTimetable(false);
+                      } else {
+                        setIsEditingTimetable(true);
+                      }
+                    }} className={isEditingTimetable ? "btn-royal" : "btn-sky"}>
+                      {isEditingTimetable ? "💾 Save Changes" : "✏️ Edit Timetable"}
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "1rem", borderRadius: "12px", border: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
+                  <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="premium-input" style={{ flex: 1, minWidth: "150px" }}>
+                    <option value="CSE">CSE</option>
+                    <option value="IT">IT</option>
+                    <option value="ECE">ECE</option>
+                    <option value="MECH">MECH</option>
+                  </select>
+                  <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="premium-input" style={{ flex: 1, minWidth: "150px" }}>
+                    <option value="I">Year I</option>
+                    <option value="II">Year II</option>
+                    <option value="III">Year III</option>
+                    <option value="IV">Year IV</option>
+                  </select>
+                  <select value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)} className="premium-input" style={{ flex: 1, minWidth: "150px" }}>
+                    <option value="A">Section A</option>
+                    <option value="B">Section B</option>
+                    <option value="C">Section C</option>
+                  </select>
+                  <button onClick={async () => {
+                    setLoadingTimetable(true);
+                    setIsEditingTimetable(false);
+                    const classId = `${selectedYear}${selectedDept}${selectedSection}`;
+                    const res = await fetch(`/api/admin/timetable?classId=${classId}`).then(r => r.json());
+                    if (res.success) {
+                      setTimetable(res.timetable);
+                    } else {
+                      alert("Error: " + res.error);
+                    }
+                    setLoadingTimetable(false);
+                  }} className="btn-royal" style={{ minWidth: "150px" }}>Fetch Timetable</button>
+                </div>
+
+                {loadingTimetable ? (
+                  <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>Loading timetable...</div>
+                ) : timetable.length > 0 ? (
+                  <div style={{ backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)", overflowX: "auto", boxShadow: "var(--shadow-card)" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-muted)" }}>
+                          <th style={{ padding: "0.85rem", width: "80px" }}>Day</th>
+                          {[1,2,3,4,5,6,7,8].map(p => <th key={p} style={{ padding: "0.85rem", minWidth: "120px" }}>Period {p}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {["I", "II", "III", "IV", "V"].map(day => (
+                          <tr key={day} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                            <td style={{ padding: "0.85rem", fontWeight: "700", borderRight: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)" }}>Day {day}</td>
+                            {[1,2,3,4,5,6,7,8].map(period => {
+                              const entryIdx = timetable.findIndex(t => t.dayOrder === day && t.period === period);
+                              const entry = entryIdx !== -1 ? timetable[entryIdx] : null;
+                              return (
+                                <td key={period} style={{ padding: "0.5rem", borderRight: "1px solid var(--border-subtle)", verticalAlign: "top" }}>
+                                  {isEditingTimetable ? (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                                      <input type="text" placeholder="Subject Name" value={entry?.subjectName || ""} onChange={(e) => {
+                                        const newTt = [...timetable];
+                                        if (entryIdx !== -1) newTt[entryIdx].subjectName = e.target.value;
+                                        else newTt.push({ dayOrder: day, period, subjectName: e.target.value, subjectCode: "", facultyName: "", roomNo: "", timeRange: `Period ${period}` });
+                                        setTimetable(newTt);
+                                      }} style={{ width: "100%", padding: "0.25rem", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-input)", color: "var(--text-main)" }} />
+                                      <input type="text" placeholder="Faculty" value={entry?.facultyName || ""} onChange={(e) => {
+                                        const newTt = [...timetable];
+                                        if (entryIdx !== -1) newTt[entryIdx].facultyName = e.target.value;
+                                        setTimetable(newTt);
+                                      }} style={{ width: "100%", padding: "0.25rem", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-input)", color: "var(--text-main)" }} />
+                                      <input type="text" placeholder="Room No" value={entry?.roomNo || ""} onChange={(e) => {
+                                        const newTt = [...timetable];
+                                        if (entryIdx !== -1) newTt[entryIdx].roomNo = e.target.value;
+                                        setTimetable(newTt);
+                                      }} style={{ width: "100%", padding: "0.25rem", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-input)", color: "var(--text-main)" }} />
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                                      <strong style={{ color: "var(--sky-blue)", lineHeight: "1.2", minHeight: "1.2rem" }}>{entry?.subjectName || "-"}</strong>
+                                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", minHeight: "1rem" }}>{entry?.facultyName || "-"}</span>
+                                      <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", backgroundColor: "rgba(255,255,255,0.05)", padding: "0.1rem 0.3rem", borderRadius: "4px", alignSelf: "flex-start", minHeight: "1rem" }}>{entry?.roomNo || "-"}</span>
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
+                    No timetable found for this class. Select criteria and click Fetch.
+                  </div>
+                )}
               </div>
             )}
 
