@@ -46,22 +46,54 @@ export async function GET(request: Request) {
     }
 
     // 2. Extract Details & Compute Class ID (e.g. 2nd year CSE A -> IICSEA)
-    // Assuming semester 3 or 4 is Year II, etc.
     const semester = user.studentProfile.semester || 3; 
     let yearStr = "I";
     if (semester === 3 || semester === 4) yearStr = "II";
     if (semester === 5 || semester === 6) yearStr = "III";
     if (semester === 7 || semester === 8) yearStr = "IV";
 
-    const department = user.studentProfile.department || "CSE";
-    // We assume Section A by default since Section isn't in the schema yet
-    const section = "A"; 
-    const classId = `${yearStr}${department}${section}`; // e.g. "IICSEA"
+    let rawDept = user.studentProfile.department || "CSE";
+    let department = rawDept;
+    let section = "A";
 
-    // 3. Set the Day Order based on explicit user instruction:
-    // "start with tommorow as day order 4 so today day order 3"
-    const currentDayOrder = "III"; // Today is Day Order 3
-    const tomorrowDayOrder = "IV"; // Tomorrow is Day Order 4
+    const secMatch = rawDept.match(/\(Sec\s+([A-Z])\)/i);
+    if (secMatch) {
+      section = secMatch[1].toUpperCase();
+      department = rawDept.replace(/\s*\(Sec\s+[A-Z]\)\s*/i, "").trim();
+    }
+    const classId = `${yearStr}${department}${section}`; // e.g. "IICSEC"
+
+    // 3. Compute Day Order dynamically
+    const baseDate = new Date('2026-09-13T00:00:00'); // Base date was DO 3
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let current = new Date(baseDate);
+    let weekdays = 0;
+    // Iterate to count weekdays between baseDate and today
+    while (current < today) {
+        current.setDate(current.getDate() + 1);
+        const day = current.getDay();
+        if (day !== 0 && day !== 6) { 
+            weekdays++;
+        }
+    }
+    // Handle past dates if server time is earlier than baseDate
+    while (current > today) {
+        current.setDate(current.getDate() - 1);
+        const day = current.getDay();
+        if (day !== 0 && day !== 6) { 
+            weekdays--;
+        }
+    }
+
+    // Mathematical modulo that handles negative numbers correctly
+    const doIndex = (((2 + weekdays) % 5) + 5) % 5; 
+    const doNumber = doIndex + 1;
+    const roman = ["I", "II", "III", "IV", "V"];
+    
+    const currentDayOrder = roman[doNumber - 1]; 
+    const tomorrowDayOrder = roman[doNumber % 5]; 
 
     // 4. Fetch the timetable for the student's class and current day order
     let timetable: any[] = [];
