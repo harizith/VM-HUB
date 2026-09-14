@@ -1,14 +1,42 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function GET(request: Request) {
   try {
-    // 1. In a real app, we would get the student's email from the session (e.g. NextAuth).
-    // For now, we will fetch the first user in the DB who is a STUDENT.
-    const user = await prisma.user.findFirst({
-      where: { role: "STUDENT" },
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
+    }
+
+    const email = session.user.email;
+
+    // 1. Fetch the logged in user
+    let user = await prisma.user.findUnique({
+      where: { email },
       include: { studentProfile: true }
     });
+
+    // Fallback: If not found in User, they might be in UserMode (from older schema)
+    if (!user) {
+      const um = await prisma.userMode.findUnique({ where: { emailid: email }});
+      if (um) {
+        user = {
+          name: um.emailid.split("@")[0],
+          vmNo: um.vmno,
+          email: um.emailid,
+          role: um.usermode.toUpperCase(),
+          studentProfile: {
+             department: "CSE",
+             semester: 5,
+             section: "A",
+             rollNumber: um.vmno
+          }
+        } as any;
+      }
+    }
 
     if (!user || !user.studentProfile) {
       return NextResponse.json({ 
