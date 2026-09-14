@@ -4,21 +4,13 @@ import prisma from "@/lib/prisma";
 // GET /api/admin/departments - Fetch departments
 export async function GET() {
   try {
-    // 1. Try standard Prisma ORM
-    if ((prisma as any).department) {
-      const departments = await (prisma as any).department.findMany({
-        orderBy: { code: "asc" },
-      });
-      return NextResponse.json({ success: true, departments });
-    }
-
-    // 2. Direct raw SQL fallback if Prisma client generator was locked by Windows dev process
-    const departments: any[] = await prisma.$queryRaw`
-      SELECT id, code, name, "hodName" FROM "Department" ORDER BY code ASC
-    `;
+    const departments = await prisma.department.findMany({
+      orderBy: { code: "asc" },
+    });
 
     return NextResponse.json({ success: true, departments });
   } catch (error: any) {
+    console.error("Error fetching departments:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -37,39 +29,26 @@ export async function POST(req: Request) {
     const cleanName = name.trim();
     const cleanHod = hodName ? hodName.trim() : null;
 
-    // 1. Try standard Prisma ORM
-    if ((prisma as any).department) {
-      const existing = await (prisma as any).department.findUnique({
-        where: { code: cleanCode },
-      });
+    const existing = await prisma.department.findUnique({
+      where: { code: cleanCode },
+    });
 
-      if (existing) {
-        return NextResponse.json({ success: false, error: `Department '${cleanCode}' already exists` }, { status: 400 });
-      }
-
-      const newDept = await (prisma as any).department.create({
-        data: {
-          code: cleanCode,
-          name: cleanName,
-          hodName: cleanHod,
-        },
-      });
-
-
-
-      return NextResponse.json({ success: true, department: newDept });
+    if (existing) {
+      return NextResponse.json({ success: false, error: `Department '${cleanCode}' already exists` }, { status: 400 });
     }
 
-    // 2. Direct raw SQL fallback for creation
-    const newId = crypto.randomUUID();
-    await prisma.$executeRaw`
-      INSERT INTO "Department" (id, code, name, "hodName", "createdAt")
-      VALUES (${newId}, ${cleanCode}, ${cleanName}, ${cleanHod}, NOW())
-    `;
+    const newDept = await prisma.department.create({
+      data: {
+        code: cleanCode,
+        name: cleanName,
+        hodName: cleanHod,
+      },
+    });
 
-    const newDept = { id: newId, code: cleanCode, name: cleanName, hodName: cleanHod };
-
-    return NextResponse.json({ success: true, department: newDept });
+    return NextResponse.json({ 
+      success: true, 
+      department: newDept 
+    });
   } catch (error: any) {
     console.error("Error creating department:", error);
     return NextResponse.json({ success: false, error: error.message || "Failed to create department" }, { status: 500 });
@@ -80,25 +59,19 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const deptId = searchParams.get("id");
+    const deptId = searchParams.get("id"); 
 
     if (!deptId) {
       return NextResponse.json({ success: false, error: "Department ID required" }, { status: 400 });
     }
 
-    if ((prisma as any).department) {
-      await (prisma as any).department.delete({
-        where: { id: deptId },
-      });
-      return NextResponse.json({ success: true, deletedId: deptId });
-    }
-
-    await prisma.$executeRaw`
-      DELETE FROM "Department" WHERE id = ${deptId}
-    `;
-
+    await prisma.department.delete({
+      where: { id: deptId },
+    });
+    
     return NextResponse.json({ success: true, deletedId: deptId });
   } catch (error: any) {
+    console.error("Error deleting department:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

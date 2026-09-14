@@ -4,13 +4,13 @@ import prisma from "@/lib/prisma";
 // GET /api/admin/subjects
 export async function GET() {
   try {
-    const subjects: any[] = await prisma.$queryRaw`
-      SELECT id, code, name, credits, semester, "departmentCode", "createdAt"
-      FROM "Subject"
-      ORDER BY code ASC
-    `;
+    const subjects = await prisma.subject.findMany({
+      orderBy: { code: "asc" }
+    });
+
     return NextResponse.json({ success: true, subjects });
   } catch (error: any) {
+    console.error("Error fetching subjects:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -32,22 +32,30 @@ export async function POST(req: Request) {
     const dept = (departmentCode || "CSE").toUpperCase().trim();
 
     // Check duplicate
-    const existing: any[] = await prisma.$queryRaw`
-      SELECT id FROM "Subject" WHERE code = ${cleanCode} LIMIT 1
-    `;
+    const existing = await prisma.subject.findUnique({
+      where: { code: cleanCode }
+    });
 
-    if (existing && existing.length > 0) {
+    if (existing) {
       return NextResponse.json({ success: false, error: `Subject code '${cleanCode}' already exists.` }, { status: 400 });
     }
 
-    const newId = crypto.randomUUID();
-    await prisma.$executeRaw`
-      INSERT INTO "Subject" (id, code, name, credits, semester, "departmentCode", "createdAt")
-      VALUES (${newId}, ${cleanCode}, ${cleanName}, ${numCredits}, ${numSem}, ${dept}, NOW())
-    `;
+    const newSubject = await prisma.subject.create({
+      data: {
+        code: cleanCode,
+        name: cleanName,
+        credits: numCredits,
+        semester: numSem,
+        departmentCode: dept
+      }
+    });
 
-    return NextResponse.json({ success: true, subject: { id: newId, code: cleanCode, name: cleanName, credits: numCredits, semester: numSem, departmentCode: dept } });
+    return NextResponse.json({ 
+      success: true, 
+      subject: newSubject 
+    });
   } catch (error: any) {
+    console.error("Error creating subject:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -56,12 +64,17 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const id = searchParams.get("id"); 
+    
     if (!id) return NextResponse.json({ success: false, error: "ID required" }, { status: 400 });
 
-    await prisma.$executeRaw`DELETE FROM "Subject" WHERE id = ${id}`;
+    await prisma.subject.delete({
+      where: { id: id }
+    });
+    
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error: any) {
+    console.error("Error deleting subject:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
