@@ -131,7 +131,7 @@ export default function MessagesPage() {
                       borderRadius: "6px",
                       backgroundColor: colors.bg,
                       color: colors.text,
-                      border: \`1px solid \${colors.border}\`
+                      border: `1px solid ${colors.border}`
                     }}>
                       {notice.category.toUpperCase()}
                     </span>
