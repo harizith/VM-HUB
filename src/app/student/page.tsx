@@ -60,7 +60,7 @@ export default function DashboardPage() {
       <header className="student-header">
         <div>
           <div className="student-date">{dateStr} • Day Order {data?.currentDayOrder || "III"}</div>
-          <h1>Hey {data?.student?.name ? data.student.name.split(" ")[0] : "Student"}</h1>
+          <h1>Hey {data?.student?.name ? data.student.name : "Student"}</h1>
         </div>
         <div className="student-course-info">
           <strong>B.Tech {data?.student?.department || "CSE"}</strong>

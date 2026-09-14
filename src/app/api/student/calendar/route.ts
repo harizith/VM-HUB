@@ -13,13 +13,11 @@ export async function GET(request: Request) {
 
     const email = session.user.email;
 
-    // 1. Fetch the logged in user
     let user = await prisma.user.findUnique({
       where: { email },
       include: { studentProfile: true }
     });
 
-    // Fallback: If not found in User, they might be in UserMode (from older schema)
     if (!user) {
       const um = await prisma.userMode.findUnique({ where: { emailid: email }});
       if (um) {
@@ -39,14 +37,9 @@ export async function GET(request: Request) {
     }
 
     if (!user || !user.studentProfile) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "No student profile found in the database. Please create one in the Admin mode." 
-      }, { status: 404 });
+      return NextResponse.json({ success: false, error: "No student profile found." }, { status: 404 });
     }
 
-    // 2. Extract Details & Compute Class ID (e.g. 2nd year CSE A -> IICSEA)
-    // Assuming semester 3 or 4 is Year II, etc.
     const semester = user.studentProfile.semester || 3; 
     let yearStr = "I";
     if (semester === 3 || semester === 4) yearStr = "II";
@@ -54,47 +47,42 @@ export async function GET(request: Request) {
     if (semester === 7 || semester === 8) yearStr = "IV";
 
     const department = user.studentProfile.department || "CSE";
-    // We assume Section A by default since Section isn't in the schema yet
     const section = "A"; 
-    const classId = `${yearStr}${department}${section}`; // e.g. "IICSEA"
+    const classId = `${yearStr}${department}${section}`;
 
-    // 3. Set the Day Order based on explicit user instruction:
-    // "start with tommorow as day order 4 so today day order 3"
-    const currentDayOrder = "III"; // Today is Day Order 3
-    const tomorrowDayOrder = "IV"; // Tomorrow is Day Order 4
-
-    // 4. Fetch the timetable for the student's class and current day order
-    let timetable: any[] = [];
+    let fullTimetable: any[] = [];
     try {
-      timetable = await prisma.$queryRaw`
+      fullTimetable = await prisma.$queryRaw`
         SELECT "id", "classId", "dayOrder", "period", "timeRange", "subjectCode", "subjectName", "facultyName", "roomNo"
         FROM "TimetableEntry"
-        WHERE "classId" = ${classId} AND "dayOrder" = ${currentDayOrder}
-        ORDER BY "period" ASC
+        WHERE "classId" = ${classId}
+        ORDER BY "dayOrder" ASC, "period" ASC
       `;
     } catch (e) {
       console.error("Could not fetch timetable entries via raw query", e);
     }
 
+    // Group by Day Order
+    const grouped: Record<string, any[]> = {
+      "I": [], "II": [], "III": [], "IV": [], "V": []
+    };
+
+    fullTimetable.forEach(entry => {
+      if (grouped[entry.dayOrder]) {
+        grouped[entry.dayOrder].push(entry);
+      }
+    });
+
     return NextResponse.json({
       success: true,
       data: {
-        student: {
-          name: user.name,
-          vmNo: user.vmNo || user.studentProfile.rollNumber,
-          department: department,
-          semester: semester,
-          section: section,
-          classId: classId
-        },
-        currentDayOrder,
-        tomorrowDayOrder,
-        timetable
+        classId,
+        timetable: grouped
       }
     });
 
   } catch (error: any) {
-    console.error("Dashboard API Error:", error);
+    console.error("Calendar API Error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
