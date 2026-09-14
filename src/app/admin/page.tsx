@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight } from "lucide-react";
 
 interface UserItem {
   id: string;
@@ -42,6 +43,7 @@ interface TimetableEntry {
 export default function AdminPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "notices" | "timetable">("users");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Role Subdivision Filter State
   const [userRoleSubdivision, setUserRoleSubdivision] = useState<"ALL" | "STUDENT" | "FACULTY" | "HOD" | "ADMIN">("ALL");
@@ -208,9 +210,12 @@ export default function AdminPage() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "var(--bg-page)", color: "var(--text-main)", fontFamily: "var(--font-sans, system-ui, sans-serif)", transition: "all 0.3s ease", position: "relative", overflowX: "hidden" }}>
+    <div className="admin-layout">
+      {/* MOBILE SIDEBAR OVERLAY */}
+      <div className={`admin-sidebar-overlay ${isMobileSidebarOpen ? 'open' : ''}`} onClick={() => setIsMobileSidebarOpen(false)} />
+
       {/* LEFT SIDEBAR */}
-      <aside style={{ width: "260px", backgroundColor: "var(--bg-card)", borderRight: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "1.5rem 1rem", position: "sticky", top: 0, height: "100vh", boxShadow: "var(--shadow-card)" }}>
+      <aside className={`admin-sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-subtle)", marginBottom: "1.5rem" }}>
             <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg, var(--royal-blue) 0%, var(--sky-blue) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "1.1rem", color: "white", boxShadow: "0 4px 12px rgba(29, 78, 216, 0.3)" }}>
@@ -224,14 +229,14 @@ export default function AdminPage() {
 
           <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {[
-              { id: "users", label: "👥 User Accounts", count: users.length },
-              { id: "depts", label: "🏛️ Departments", count: depts.length },
-              { id: "subjects", label: "📚 Course Catalog", count: subjects.length },
-              { id: "notices", label: "📢 Announcements", count: notices.length },
-              { id: "timetable", label: "📅 Timetables", count: 0 },
+              { id: "users", label: "User Accounts", Icon: Users, count: users.length },
+              { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
+              { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
+              { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
+              { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
             ].map((nav) => (
               <button key={nav.id} onClick={() => { setActiveTab(nav.id as any); setSelectedUser(null); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "0.7rem 0.9rem", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "0.85rem", backgroundColor: activeTab === nav.id ? "var(--royal-blue)" : "transparent", color: activeTab === nav.id ? "#ffffff" : "var(--text-muted)", transition: "all 0.2s ease" }}>
-                <span>{nav.label}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><nav.Icon size={16} /> {nav.label}</span>
                 <span style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", borderRadius: "9999px", backgroundColor: activeTab === nav.id ? "rgba(255,255,255,0.2)" : "var(--border-subtle)", color: activeTab === nav.id ? "#ffffff" : "var(--text-muted)" }}>{nav.count}</span>
               </button>
             ))}
@@ -299,7 +304,7 @@ export default function AdminPage() {
           </div>
 
           <button onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", width: "100%", backgroundColor: "var(--bg-input)", color: "var(--text-main)", border: "1px solid var(--border-subtle)", padding: "0.6rem", borderRadius: "8px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-            {theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode"}
+            {theme === "dark" ? <><Sun size={16} /> Light Mode</> : <><Moon size={16} /> Dark Mode</>}
           </button>
           <Link href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", color: "#ef4444", fontSize: "0.85rem", textDecoration: "none", border: "1px solid rgba(239, 68, 68, 0.3)", backgroundColor: "rgba(239, 68, 68, 0.1)", padding: "0.6rem", borderRadius: "8px", fontWeight: "600" }}>
             Sign Out
@@ -308,21 +313,28 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main style={{ flex: 1, padding: "2rem", overflowY: "auto" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-subtle)", marginBottom: "2rem" }}>
-          <div>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>
-              {activeTab === "users" && "User Directory & Role Subdivisions"}
-              {activeTab === "depts" && "Academic Departments"}
-              {activeTab === "subjects" && "Course & Subject Catalog"}
-              {activeTab === "notices" && "System Announcements & Broadcasts"}
-              {activeTab === "timetable" && "Class Timetable Management"}
-            </h1>
-            <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "rgba(56, 189, 248, 0.15)", color: "var(--sky-blue)", padding: "0.4rem 0.85rem", borderRadius: "9999px", fontSize: "0.825rem", fontWeight: "600", border: "1px solid var(--border-active)" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--sky-blue)" }}></span>
-            System Online
+      <main className="admin-main">
+        <header className="admin-header-container">
+          <div className="admin-header-top">
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <button className="hamburger-btn" onClick={() => setIsMobileSidebarOpen(true)}>
+                ☰
+              </button>
+              <div>
+                <h1 style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>
+                  {activeTab === "users" && "User Directory & Role Subdivisions"}
+                  {activeTab === "depts" && "Academic Departments"}
+                  {activeTab === "subjects" && "Course & Subject Catalog"}
+                  {activeTab === "notices" && "System Announcements & Broadcasts"}
+                  {activeTab === "timetable" && "Class Timetable Management"}
+                </h1>
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "rgba(56, 189, 248, 0.15)", color: "var(--sky-blue)", padding: "0.4rem 0.85rem", borderRadius: "9999px", fontSize: "0.825rem", fontWeight: "600", border: "1px solid var(--border-active)" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--sky-blue)" }}></span>
+              System Online
+            </div>
           </div>
         </header>
 
@@ -344,11 +356,11 @@ export default function AdminPage() {
                 {/* ROLE SUBDIVISION PILLS */}
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "0.5rem", borderRadius: "10px", border: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                   {[
-                    { id: "ALL", label: "🌐 All Accounts", count: users.length },
-                    { id: "STUDENT", label: "👨‍🎓 Students", count: users.filter((u) => u.role === "STUDENT").length },
-                    { id: "FACULTY", label: "👨‍🏫 Teachers / Faculty", count: users.filter((u) => u.role === "FACULTY").length },
-                    { id: "HOD", label: "👔 HODs", count: users.filter((u) => u.role === "HOD").length },
-                    { id: "ADMIN", label: "🛡️ Administrators", count: users.filter((u) => u.role === "ADMIN").length },
+                    { id: "ALL", label: "All Accounts", Icon: Globe, count: users.length },
+                    { id: "STUDENT", label: "Students", Icon: GraduationCap, count: users.filter((u) => u.role === "STUDENT").length },
+                    { id: "FACULTY", label: "Teachers / Faculty", Icon: Briefcase, count: users.filter((u) => u.role === "FACULTY").length },
+                    { id: "HOD", label: "HODs", Icon: UserCircle, count: users.filter((u) => u.role === "HOD").length },
+                    { id: "ADMIN", label: "Administrators", Icon: Shield, count: users.filter((u) => u.role === "ADMIN").length },
                   ].map((sub) => (
                     <button
                       key={sub.id}
@@ -368,7 +380,7 @@ export default function AdminPage() {
                         transition: "all 0.2s ease"
                       }}
                     >
-                      <span>{sub.label}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}><sub.Icon size={16} /> {sub.label}</span>
                       <span style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem", borderRadius: "9999px", backgroundColor: userRoleSubdivision === sub.id ? "rgba(15, 23, 42, 0.15)" : "var(--border-subtle)" }}>
                         {sub.count}
                       </span>
@@ -376,8 +388,8 @@ export default function AdminPage() {
                   ))}
                 </div>
 
-                <div style={{ backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
+                <div className="responsive-table-wrapper">
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem", minWidth: "600px" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-muted)" }}>
                         <th style={{ padding: "0.85rem 1rem" }}>User Name</th><th style={{ padding: "0.85rem 1rem" }}>Email Address</th><th style={{ padding: "0.85rem 1rem" }}>Subdivision Role</th><th style={{ padding: "0.85rem 1rem" }}>Status</th><th style={{ padding: "0.85rem 1rem" }}>Profile Action</th>
@@ -466,8 +478,8 @@ export default function AdminPage() {
                   </div>
                   <button onClick={() => setShowSubjectModal(true)} className="btn-royal">+ Add New Subject</button>
                 </div>
-                <div style={{ backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
+                <div className="responsive-table-wrapper">
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem", minWidth: "700px" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-muted)" }}>
                         <th style={{ padding: "0.85rem 1rem" }}>Code</th>
@@ -510,7 +522,7 @@ export default function AdminPage() {
                                 cursor: "pointer"
                               }}
                             >
-                              👨‍🏫 View Handling Staff →
+                              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}><Users size={14} /> View Handling Staff <ArrowRight size={14} /></span>
                             </button>
                           </td>
                           <td style={{ padding: "0.85rem 1rem" }}>
@@ -581,7 +593,9 @@ export default function AdminPage() {
                         setIsEditingTimetable(true);
                       }
                     }} className={isEditingTimetable ? "btn-royal" : "btn-sky"}>
-                      {isEditingTimetable ? "💾 Save Changes" : "✏️ Edit Timetable"}
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        {isEditingTimetable ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Timetable</>}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -621,8 +635,8 @@ export default function AdminPage() {
                 {loadingTimetable ? (
                   <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>Loading timetable...</div>
                 ) : timetable.length > 0 ? (
-                  <div style={{ backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)", overflowX: "auto", boxShadow: "var(--shadow-card)" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+                  <div className="responsive-table-wrapper">
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem", minWidth: "900px" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-muted)" }}>
                           <th style={{ padding: "0.85rem", width: "80px" }}>Day</th>
@@ -687,21 +701,10 @@ export default function AdminPage() {
 
       {/* USER PROFILE SIDE DRAWER / SLIDE-OVER SIDEBAR */}
       {selectedUser && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 90, display: "flex", justifyContent: "flex-end" }} onClick={() => setSelectedUser(null)}>
+        <div className="admin-drawer-container" onClick={() => setSelectedUser(null)}>
           <aside
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "380px",
-              height: "100vh",
-              backgroundColor: "var(--bg-card)",
-              borderLeft: "1px solid var(--border-subtle)",
-              boxShadow: "-10px 0 30px rgba(0,0,0,0.5)",
-              padding: "2rem",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              overflowY: "auto"
-            }}
+            className="admin-drawer"
           >
             <div>
               {/* Drawer Header */}
@@ -868,21 +871,11 @@ export default function AdminPage() {
 
       {/* SUBJECT HANDLING STAFF SIDE DRAWER / SLIDE-OVER PANEL */}
       {selectedSubject && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 95, display: "flex", justifyContent: "flex-end" }} onClick={() => setSelectedSubject(null)}>
+        <div className="admin-drawer-container" onClick={() => setSelectedSubject(null)}>
           <aside
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "420px",
-              height: "100vh",
-              backgroundColor: "var(--bg-card)",
-              borderLeft: "1px solid var(--border-subtle)",
-              boxShadow: "-10px 0 30px rgba(0,0,0,0.5)",
-              padding: "2rem",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              overflowY: "auto"
-            }}
+            className="admin-drawer"
+            style={{ width: "420px" }}
           >
             <div>
               {/* Drawer Header */}
@@ -1034,8 +1027,8 @@ export default function AdminPage() {
 
       {/* MODALS */}
       {showUserModal && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" }}>
-          <div style={{ backgroundColor: "var(--bg-card)", padding: "2rem", borderRadius: "16px", maxWidth: "450px", width: "100%", border: "1px solid var(--border-subtle)" }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
             <h3 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Create New User Account</h3>
             <form onSubmit={handleCreateUser} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Full Name" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} required className="premium-input" />
@@ -1054,8 +1047,8 @@ export default function AdminPage() {
       )}
 
       {showDeptModal && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" }}>
-          <div style={{ backgroundColor: "var(--bg-card)", padding: "2rem", borderRadius: "16px", maxWidth: "450px", width: "100%", border: "1px solid var(--border-subtle)" }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
             <h3 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Create New Department</h3>
             <form onSubmit={handleCreateDept} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Dept Code (e.g. AI-DS)" value={newDeptCode} onChange={(e) => setNewDeptCode(e.target.value)} required className="premium-input" />
@@ -1071,8 +1064,8 @@ export default function AdminPage() {
       )}
 
       {showSubjectModal && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" }}>
-          <div style={{ backgroundColor: "var(--bg-card)", padding: "2rem", borderRadius: "16px", maxWidth: "450px", width: "100%", border: "1px solid var(--border-subtle)" }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
             <h3 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Add New Subject to Catalog</h3>
             <form onSubmit={handleCreateSubject} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Subject Code (e.g. CS8591)" value={newSubCode} onChange={(e) => setNewSubCode(e.target.value)} required className="premium-input" />
@@ -1092,8 +1085,8 @@ export default function AdminPage() {
       )}
 
       {showNoticeModal && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" }}>
-          <div style={{ backgroundColor: "var(--bg-card)", padding: "2rem", borderRadius: "16px", maxWidth: "500px", width: "100%", border: "1px solid var(--border-subtle)" }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal" style={{ maxWidth: "500px" }}>
             <h3 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Create System Announcement</h3>
             <form onSubmit={handleCreateNotice} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Notice Title" value={newNoticeTitle} onChange={(e) => setNewNoticeTitle(e.target.value)} required className="premium-input" />
