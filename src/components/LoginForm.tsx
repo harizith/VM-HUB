@@ -34,7 +34,7 @@ export default function LoginForm() {
         if (userRole === "ADMIN") {
           window.location.href = "/admin";
         } else {
-          window.location.href = "/dashboard";
+          window.location.href = "/student";
         }
       } else {
         console.error("SignIn failed:", res);

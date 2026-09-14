@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Inbox, User } from "lucide-react";
+import { Home, Calendar, MessageCircle, User } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,18 +13,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="student-sidebar">
         <div className="student-sidebar-logo">VM</div>
         
-        <Link href="/dashboard" className={`student-nav-item ${pathname === "/dashboard" ? "active" : ""}`}>
-          <Home size={24} />
+        <Link href="/student" className={`student-nav-item ${pathname === "/student" ? "active" : ""}`}>
+          <Home size={20} />
         </Link>
-        <Link href="/dashboard/calendar" className={`student-nav-item ${pathname === "/dashboard/calendar" ? "active" : ""}`}>
-          <Calendar size={24} />
+        <Link href="/student/calendar" className={`student-nav-item ${pathname === "/student/calendar" ? "active" : ""}`}>
+          <Calendar size={20} />
         </Link>
-        <Link href="/dashboard/messages" className={`student-nav-item ${pathname === "/dashboard/messages" ? "active" : ""}`}>
-          <Inbox size={24} />
+        <Link href="/student/messages" className={`student-nav-item ${pathname === "/student/messages" ? "active" : ""}`}>
+          <MessageCircle size={20} />
         </Link>
 
-        <div className="student-nav-bottom">
-          <Link href="/dashboard/profile" className={`student-nav-item ${pathname === "/dashboard/profile" ? "active" : ""}`}>
+        <div style={{ marginTop: "auto" }}>
+          <Link href="/student/profile" className={`student-nav-item ${pathname === "/student/profile" ? "active" : ""}`}>
             <User size={24} />
           </Link>
         </div>

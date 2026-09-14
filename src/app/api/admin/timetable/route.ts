@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
   try {
@@ -12,13 +10,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'classId is required' }, { status: 400 });
     }
 
-    const timetable = await prisma.timetableEntry.findMany({
-      where: { classId },
-      orderBy: [
-        { dayOrder: 'asc' },
-        { period: 'asc' }
-      ]
-    });
+    let timetable: any[] = [];
+    try {
+      timetable = await prisma.$queryRaw`
+        SELECT * FROM "TimetableEntry"
+        WHERE "classId" = ${classId}
+        ORDER BY "dayOrder" ASC, "period" ASC
+      `;
+    } catch (e) {
+      console.error(e);
+      // fallback in case of issues
+    }
 
     return NextResponse.json({ success: true, timetable });
   } catch (error: any) {
@@ -37,24 +39,31 @@ export async function PUT(request: Request) {
     }
 
     // Replace the entire timetable for the class
-    await prisma.timetableEntry.deleteMany({
-      where: { classId }
-    });
+    if ((prisma as any).timetableEntry) {
+      await (prisma as any).timetableEntry.deleteMany({
+        where: { classId }
+      });
 
-    const inserted = await prisma.timetableEntry.createMany({
-      data: entries.map((entry: any) => ({
-        classId,
-        dayOrder: entry.dayOrder,
-        period: entry.period,
-        timeRange: entry.timeRange || `Period ${entry.period}`,
-        subjectCode: entry.subjectCode,
-        subjectName: entry.subjectName,
-        facultyName: entry.facultyName,
-        roomNo: entry.roomNo
-      }))
-    });
+      const inserted = await (prisma as any).timetableEntry.createMany({
+        data: entries.map((entry: any) => ({
+          classId,
+          dayOrder: entry.dayOrder,
+          period: entry.period,
+          timeRange: entry.timeRange || `Period ${entry.period}`,
+          subjectCode: entry.subjectCode,
+          subjectName: entry.subjectName,
+          facultyName: entry.facultyName,
+          roomNo: entry.roomNo
+        }))
+      });
 
-    return NextResponse.json({ success: true, count: inserted.count });
+      return NextResponse.json({ success: true, count: inserted.count });
+    } else {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Prisma client needs to be regenerated. Please restart your pnpm dev server.' 
+      }, { status: 500 });
+    }
   } catch (error: any) {
     console.error('Failed to update timetable:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

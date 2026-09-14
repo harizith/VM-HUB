@@ -56,7 +56,7 @@ model FacultyProfile {
 }
 
 model Department {
-  vmNo      String   @id // VM NO primary key for Department
+  id        String   @id @default(uuid())
   code      String   @unique // e.g. CSE, ECE, MECH
   name      String   // e.g. Computer Science and Engineering
   hodName   String?  
@@ -64,7 +64,8 @@ model Department {
 }
 
 model Subject {
-  code           String   @id // Subject code as primary key
+  id             String   @id @default(uuid())
+  code           String   @unique // Subject code
   name           String   // e.g. Computer Networks
   credits        Int      @default(3)
   semester       Int      @default(5)
@@ -88,4 +89,19 @@ model SystemSetting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model TimetableEntry {
+  id          String   @id @default(uuid())
+  classId     String   // e.g., "IICSEA"
+  dayOrder    String   // e.g., "I", "II", "III", "IV", "V"
+  period      Int      // 1 to 8
+  timeRange   String
+  subjectCode String
+  subjectName String
+  facultyName String
+  roomNo      String
+  createdAt   DateTime @default(now())
+  
+  // @@unique([classId, dayOrder, period])
 }
