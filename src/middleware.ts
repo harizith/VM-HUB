@@ -1,6 +1,9 @@
 import { withAuth } from "next-auth/middleware";
 
 export default withAuth({
+  pages: {
+    signIn: "/",
+  },
   callbacks: {
     authorized: ({ req, token }) => {
       // Check if the user is authenticated
