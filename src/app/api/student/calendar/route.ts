@@ -46,8 +46,15 @@ export async function GET(request: Request) {
     if (semester === 5 || semester === 6) yearStr = "III";
     if (semester === 7 || semester === 8) yearStr = "IV";
 
-    const department = user.studentProfile.department || "CSE";
-    const section = "A"; 
+    let rawDept = user.studentProfile.department || "CSE";
+    let department = rawDept;
+    let section = "A";
+
+    const secMatch = rawDept.match(/\(Sec\s+([A-Z])\)/i);
+    if (secMatch) {
+      section = secMatch[1].toUpperCase();
+      department = rawDept.replace(/\s*\(Sec\s+[A-Z]\)\s*/i, "").trim();
+    }
     const classId = `${yearStr}${department}${section}`;
 
     let fullTimetable: any[] = [];
