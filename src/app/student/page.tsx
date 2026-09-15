@@ -172,20 +172,47 @@ export default function DashboardPage() {
         <div className="student-card premium-card">
           <h3 style={{ fontSize: "1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>Department notices</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <span style={{ backgroundColor: "rgba(217, 119, 6, 0.1)", color: "#d97706", padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "700" }}>EXAM</span>
-                <span style={{ fontSize: "0.9rem", fontWeight: "600", color: "var(--text-main)" }}>Cia 1</span>
-              </div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>2h ago</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <span style={{ backgroundColor: "rgba(79, 70, 229, 0.1)", color: "#4f46e5", padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "700" }}>EVENT</span>
-                <span style={{ fontSize: "0.9rem", fontWeight: "600", color: "var(--text-main)" }}>27/8/27</span>
-              </div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>1d ago</span>
-            </div>
+            {data?.notices && data.notices.length > 0 ? (
+              data.notices.map((notice: any) => {
+                // Determine color based on category
+                let badgeColor = "rgba(79, 70, 229, 0.1)";
+                let textColor = "#4f46e5";
+                
+                if (notice.category === "URGENT") {
+                  badgeColor = "rgba(239, 68, 68, 0.1)";
+                  textColor = "#ef4444";
+                } else if (notice.category === "EXAM") {
+                  badgeColor = "rgba(217, 119, 6, 0.1)";
+                  textColor = "#d97706";
+                }
+
+                // Calculate relative time (e.g. 2h ago, 1d ago)
+                const now = new Date();
+                const noticeDate = new Date(notice.createdAt);
+                const diffMs = now.getTime() - noticeDate.getTime();
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                let timeStr = "";
+                
+                if (diffHours < 24) {
+                  timeStr = diffHours === 0 ? "Just now" : `${diffHours}h ago`;
+                } else {
+                  const diffDays = Math.floor(diffHours / 24);
+                  timeStr = `${diffDays}d ago`;
+                }
+
+                return (
+                  <div key={notice.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid var(--border-subtle)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <span style={{ backgroundColor: badgeColor, color: textColor, padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "700" }}>{notice.category || "GENERAL"}</span>
+                      <span style={{ fontSize: "0.9rem", fontWeight: "600", color: "var(--text-main)" }}>{notice.title}</span>
+                    </div>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{timeStr}</span>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "1rem 0" }}>No new notices</div>
+            )}
           </div>
         </div>
       </div>

@@ -110,6 +110,17 @@ export async function GET(request: Request) {
       console.error("Could not fetch timetable entries via raw query", e);
     }
 
+    // 5. Fetch recent notices
+    let notices: any[] = [];
+    try {
+      notices = await prisma.notice.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 3
+      });
+    } catch (e) {
+      console.error("Could not fetch notices", e);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -123,7 +134,8 @@ export async function GET(request: Request) {
         },
         currentDayOrder,
         tomorrowDayOrder,
-        timetable
+        timetable,
+        notices
       }
     });
 
