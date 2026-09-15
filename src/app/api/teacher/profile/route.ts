@@ -70,7 +70,7 @@ export async function PUT(request: Request) {
 
     const email = session.user.email;
     const body = await request.json();
-    const { name, password } = body;
+    const { name, password, department, designation } = body;
 
     const dataToUpdate: any = {};
     if (name) dataToUpdate.name = name;
@@ -79,16 +79,32 @@ export async function PUT(request: Request) {
     const umDataToUpdate: any = {};
     if (password) umDataToUpdate.password = password;
 
-    if (Object.keys(dataToUpdate).length === 0) {
+    const profileDataToUpdate: any = {};
+    if (department) profileDataToUpdate.department = department;
+    if (designation) profileDataToUpdate.designation = designation;
+
+    if (Object.keys(dataToUpdate).length === 0 && Object.keys(profileDataToUpdate).length === 0) {
        return NextResponse.json({ success: true, message: "Nothing to update" });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email }, include: { facultyProfile: true } });
     if (user) {
-      await prisma.user.update({
-        where: { email },
-        data: dataToUpdate
-      });
+      if (Object.keys(dataToUpdate).length > 0) {
+        await prisma.user.update({
+          where: { email },
+          data: dataToUpdate
+        });
+      }
+      
+      if (Object.keys(profileDataToUpdate).length > 0 && user.facultyProfile) {
+        // FacultyProfile relation is on vmNo, so we need vmNo from user
+        if (user.vmNo) {
+          await prisma.facultyProfile.update({
+            where: { vmNo: user.vmNo },
+            data: profileDataToUpdate
+          });
+        }
+      }
     }
 
     const um = await prisma.userMode.findUnique({ where: { emailid: email } });

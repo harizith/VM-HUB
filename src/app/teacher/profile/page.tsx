@@ -11,6 +11,9 @@ export default function TeacherProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPassword, setEditPassword] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
+  const [editDesignation, setEditDesignation] = useState("");
+
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -22,6 +25,8 @@ export default function TeacherProfilePage() {
         if (json.success) {
           setData(json.data);
           setEditName(json.data.name);
+          setEditDepartment(json.data.profile.department);
+          setEditDesignation(json.data.profile.designation);
         } else {
           setError(json.error || "Failed to load profile.");
         }
@@ -48,7 +53,12 @@ export default function TeacherProfilePage() {
       const res = await fetch("/api/teacher/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, password: editPassword || undefined })
+        body: JSON.stringify({ 
+          name: editName, 
+          password: editPassword || undefined,
+          department: editDepartment,
+          designation: editDesignation
+        })
       });
       const json = await res.json();
       if (json.success) {
@@ -115,26 +125,46 @@ export default function TeacherProfilePage() {
             </button>
           </div>
           <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>Full Name</label>
-              <input 
-                type="text" 
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
-                required
-              />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>Full Name</label>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>New Password (blank to keep)</label>
+                <input 
+                  type="password" 
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>Department</label>
+                <input 
+                  type="text" 
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>Designation</label>
+                <input 
+                  type="text" 
+                  value={editDesignation}
+                  onChange={(e) => setEditDesignation(e.target.value)}
+                  style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>New Password (leave blank to keep current)</label>
-              <input 
-                type="password" 
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
-                style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
-              />
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "0.5rem" }}>
               <button 
                 type="button" 
                 onClick={() => setIsEditing(false)}
