@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FiHome, FiCalendar, FiBell, FiUser, FiLogOut, FiMail, FiHash, FiBook, FiAward, FiCheckCircle } from "react-icons/fi";
+import { FiHome, FiCalendar, FiBell, FiUser, FiLogOut, FiMail, FiHash, FiBook, FiAward, FiCheckCircle, FiEdit2, FiX, FiSave } from "react-icons/fi";
 import { signOut } from "next-auth/react";
 
 export default function ProfilePage() {
@@ -10,12 +10,20 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const fetchProfile = () => {
+    setLoading(true);
     fetch("/api/student/profile")
       .then((res) => res.json())
       .then((json) => {
         if (json.success) {
           setData(json.data);
+          setEditName(json.data.name);
         } else {
           setError(json.error || "Failed to load profile.");
         }
@@ -26,9 +34,42 @@ export default function ProfilePage() {
         setError("An error occurred while fetching profile data.");
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchProfile();
   }, []);
 
-  if (loading) {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveLoading(true);
+    setSaveSuccess(false);
+    setError("");
+
+    try {
+      const res = await fetch("/api/student/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, password: editPassword || undefined })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSaveSuccess(true);
+        setIsEditing(false);
+        setEditPassword("");
+        fetchProfile(); // Refresh data
+      } else {
+        setError(json.error || "Failed to update profile.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("An error occurred while saving.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  if (loading && !data) {
     return (
       <div className="admin-layout">
         <div className="admin-content" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
@@ -40,16 +81,78 @@ export default function ProfilePage() {
 
   return (
     <main className="student-main">
-      <header className="student-header" style={{ marginBottom: "2rem" }}>
+      <header className="student-header" style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <h1>Your Profile</h1>
           <p className="student-subtitle">Manage and view your academic details.</p>
         </div>
+        {!isEditing && (
+          <button 
+            onClick={() => setIsEditing(true)}
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1rem", backgroundColor: "var(--royal-blue)", color: "white", border: "none", borderRadius: "8px", fontWeight: "600", cursor: "pointer" }}
+          >
+            <FiEdit2 /> Edit Profile
+          </button>
+        )}
       </header>
 
       {error && (
-        <div style={{ backgroundColor: "var(--bg-card)", color: "#ef4444", padding: "1rem", borderRadius: "8px", marginBottom: "2rem", border: "1px solid #fca5a5" }}>
+        <div style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "1rem", borderRadius: "8px", marginBottom: "2rem", border: "1px solid #fca5a5" }}>
           {error}
+        </div>
+      )}
+
+      {saveSuccess && (
+        <div style={{ backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "1rem", borderRadius: "8px", marginBottom: "2rem", border: "1px solid #6ee7b7" }}>
+          Profile updated successfully!
+        </div>
+      )}
+
+      {isEditing && (
+        <div className="student-card premium-card" style={{ marginBottom: "2rem", border: "2px solid var(--royal-blue)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+            <h3 style={{ margin: 0, color: "var(--text-main)" }}>Edit Profile</h3>
+            <button onClick={() => setIsEditing(false)} style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "1.2rem" }}>
+              <FiX />
+            </button>
+          </div>
+          <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>Full Name</label>
+              <input 
+                type="text" 
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "var(--text-main)" }}>New Password (leave blank to keep current)</label>
+              <input 
+                type="password" 
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-main)" }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
+              <button 
+                type="button" 
+                onClick={() => setIsEditing(false)}
+                style={{ padding: "0.8rem 1.5rem", borderRadius: "8px", border: "1px solid var(--border-subtle)", backgroundColor: "transparent", color: "var(--text-muted)", fontWeight: "600", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={saveLoading}
+                style={{ padding: "0.8rem 1.5rem", borderRadius: "8px", border: "none", backgroundColor: "var(--royal-blue)", color: "white", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", opacity: saveLoading ? 0.7 : 1 }}
+              >
+                {saveLoading ? "Saving..." : <><FiSave /> Save Changes</>}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
