@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       section = secMatch[1].toUpperCase();
       department = rawDept.replace(/\s*\(Sec\s+[A-Z]\)\s*/i, "").trim();
     }
-    const classId = `${yearStr}${department}${section}`; // e.g. "IICSEC"
+    const classId = `${yearStr}-${department}-${section}`; // e.g. "II-CSE-C"
 
     // 3. Compute Day Order dynamically
     const baseDate = new Date('2026-09-13T00:00:00'); // Base date was DO 3

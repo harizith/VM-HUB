@@ -331,10 +331,6 @@ export default function AdminPage() {
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "rgba(56, 189, 248, 0.15)", color: "var(--sky-blue)", padding: "0.4rem 0.85rem", borderRadius: "9999px", fontSize: "0.825rem", fontWeight: "600", border: "1px solid var(--border-active)" }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--sky-blue)" }}></span>
-              System Online
-            </div>
           </div>
         </header>
 
@@ -580,7 +576,7 @@ export default function AdminPage() {
                     <button onClick={async () => {
                       if (isEditingTimetable) {
                         setLoadingTimetable(true);
-                        const classId = `${selectedYear}${selectedDept}${selectedSection}`;
+                        const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
                         const res = await fetch("/api/admin/timetable", {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
@@ -621,7 +617,7 @@ export default function AdminPage() {
                   <button onClick={async () => {
                     setLoadingTimetable(true);
                     setIsEditingTimetable(false);
-                    const classId = `${selectedYear}${selectedDept}${selectedSection}`;
+                    const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
                     const res = await fetch(`/api/admin/timetable?classId=${classId}`).then(r => r.json());
                     if (res.success) {
                       setTimetable(res.timetable);
