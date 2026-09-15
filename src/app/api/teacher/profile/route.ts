@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     let user = await prisma.user.findUnique({
       where: { email },
-      include: { studentProfile: true }
+      include: { facultyProfile: true }
     });
 
     if (!user) {
@@ -27,41 +27,29 @@ export async function GET(request: Request) {
           email: um.emailid,
           role: um.usermode.toUpperCase(),
           status: "ACTIVE",
-          studentProfile: {
+          facultyProfile: {
              department: "CSE",
-             semester: 5,
-             section: "A",
-             batch: "2023-2027",
-             rollNumber: um.vmno
+             designation: "Faculty",
+             vmNo: um.vmno
           }
         } as any;
       }
     }
 
-    if (!user || !user.studentProfile) {
+    if (!user) {
       return NextResponse.json({ success: false, error: "Profile not found." }, { status: 404 });
     }
-
-    // Determine year
-    const sem = user.studentProfile.semester || 1;
-    let year = "1st Year";
-    if (sem === 3 || sem === 4) year = "2nd Year";
-    if (sem === 5 || sem === 6) year = "3rd Year";
-    if (sem === 7 || sem === 8) year = "4th Year";
 
     return NextResponse.json({
       success: true,
       data: {
         name: user.name,
         email: user.email,
-        vmNo: user.vmNo || user.studentProfile.rollNumber,
+        vmNo: user.vmNo || (user.facultyProfile?.vmNo || ""),
         status: user.status,
         profile: {
-          department: user.studentProfile.department,
-          semester: user.studentProfile.semester,
-          section: "A", // Default for now until schema update
-          batch: user.studentProfile.batch || "2023-2027",
-          year: year
+          department: user.facultyProfile?.department || "CSE",
+          designation: user.facultyProfile?.designation || "Faculty",
         }
       }
     });
@@ -95,7 +83,6 @@ export async function PUT(request: Request) {
        return NextResponse.json({ success: true, message: "Nothing to update" });
     }
 
-    // Attempt to update User
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
       await prisma.user.update({
@@ -104,7 +91,6 @@ export async function PUT(request: Request) {
       });
     }
 
-    // Attempt to update UserMode
     const um = await prisma.userMode.findUnique({ where: { emailid: email } });
     if (um && Object.keys(umDataToUpdate).length > 0) {
       await prisma.userMode.update({

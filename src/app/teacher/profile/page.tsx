@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { FiHome, FiCalendar, FiBell, FiUser, FiLogOut, FiMail, FiHash, FiBook, FiAward, FiCheckCircle, FiEdit2, FiX, FiSave } from "react-icons/fi";
-import { signOut } from "next-auth/react";
+import { FiMail, FiHash, FiCheckCircle, FiBook, FiAward, FiEdit2, FiX, FiSave } from "react-icons/fi";
 
-export default function ProfilePage() {
+export default function TeacherProfilePage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,7 +16,7 @@ export default function ProfilePage() {
 
   const fetchProfile = () => {
     setLoading(true);
-    fetch("/api/student/profile")
+    fetch("/api/teacher/profile")
       .then((res) => res.json())
       .then((json) => {
         if (json.success) {
@@ -47,7 +45,7 @@ export default function ProfilePage() {
     setError("");
 
     try {
-      const res = await fetch("/api/student/profile", {
+      const res = await fetch("/api/teacher/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editName, password: editPassword || undefined })
@@ -84,7 +82,7 @@ export default function ProfilePage() {
       <header className="student-header" style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <h1>Your Profile</h1>
-          <p className="student-subtitle">Manage and view your academic details.</p>
+          <p className="student-subtitle">Manage and view your faculty details.</p>
         </div>
         {!isEditing && (
           <button 
@@ -196,45 +194,37 @@ export default function ProfilePage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div className="student-card premium-card">
               <h3 style={{ margin: "0 0 1.5rem 0", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FiBook /> Academic Information
+                <FiBook /> Faculty Information
               </h3>
               
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
                 <div>
                   <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>DEPARTMENT</label>
-                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>B.Tech {data.profile.department}</div>
+                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.department}</div>
                 </div>
                 <div>
-                  <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>YEAR & SEMESTER</label>
-                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.year} (Sem {data.profile.semester})</div>
-                </div>
-                <div>
-                  <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>SECTION</label>
-                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.section}</div>
-                </div>
-                <div>
-                  <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>BATCH</label>
-                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.batch}</div>
+                  <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>DESIGNATION</label>
+                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.designation}</div>
                 </div>
               </div>
             </div>
 
             <div className="student-card premium-card" style={{ background: "linear-gradient(135deg, var(--royal-blue) 0%, #3b82f6 100%)", color: "white", border: "none" }}>
               <h3 style={{ margin: "0 0 1.5rem 0", display: "flex", alignItems: "center", gap: "0.5rem", color: "white" }}>
-                <FiAward /> Performance Overview
+                <FiAward /> Highlights
               </h3>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: "0.9rem", opacity: 0.9 }}>Overall Attendance</div>
-                  <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "0.25rem" }}>87.5%</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.9 }}>Classes Today</div>
+                  <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "0.25rem" }}>--</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.9rem", opacity: 0.9 }}>CGPA</div>
-                  <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "0.25rem" }}>8.42</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.9 }}>Total Students</div>
+                  <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "0.25rem" }}>--</div>
                 </div>
               </div>
               <div style={{ marginTop: "1.5rem", fontSize: "0.85rem", opacity: 0.8 }}>
-                * This data is a mock representation until grades are synced.
+                * Metrics will be synced automatically based on your assigned timetable.
               </div>
             </div>
           </div>
