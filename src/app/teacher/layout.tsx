@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, User, LogOut, Sun, Moon } from "lucide-react";
+import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -27,24 +27,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <div className="student-sidebar-logo-text">
               <h2 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>VM-HUB</h2>
-              <span style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "600" }}>Student Portal</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "600" }}>Faculty Portal</span>
             </div>
           </div>
           
           <div className="student-nav-group">
-            <Link href="/student" className={`student-nav-item ${pathname === "/student" ? "active" : ""}`} title="Dashboard">
+            <Link href="/teacher" className={`student-nav-item ${pathname === "/teacher" ? "active" : ""}`} title="Dashboard">
               <Home size={18} />
               <span>Dashboard</span>
             </Link>
-            <Link href="/student/calendar" className={`student-nav-item ${pathname === "/student/calendar" ? "active" : ""}`} title="Calendar">
+            <Link href="/teacher/schedule" className={`student-nav-item ${pathname === "/teacher/schedule" ? "active" : ""}`} title="My Schedule">
               <Calendar size={18} />
-              <span>Calendar</span>
+              <span>My Schedule</span>
+            </Link>
+            <Link href="/teacher/courses" className={`student-nav-item ${pathname === "/teacher/courses" ? "active" : ""}`} title="Courses">
+              <BookOpen size={18} />
+              <span>Courses</span>
+            </Link>
+            <Link href="/teacher/students" className={`student-nav-item ${pathname === "/teacher/students" ? "active" : ""}`} title="Students">
+              <Users size={18} />
+              <span>Students</span>
             </Link>
           </div>
         </div>
 
         <div className="student-nav-bottom">
-          <Link href="/student/profile"
+          <Link href="/teacher/profile"
             className="profile-card"
             style={{
               display: "flex",
@@ -80,14 +88,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               color: "white",
               fontSize: "0.95rem"
             }}>
-              S
+              F
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <div style={{ fontSize: "0.85rem", fontWeight: "700", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                 My Profile
               </div>
               <div style={{ fontSize: "0.725rem", color: "var(--sky-blue)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                Student
+                Faculty
               </div>
             </div>
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>➔</span>

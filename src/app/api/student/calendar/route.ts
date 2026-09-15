@@ -57,7 +57,7 @@ export async function GET(request: Request) {
       section = secMatch[1].toUpperCase();
       department = rawDept.replace(/\s*\(Sec\s+[A-Z]\)\s*/i, "").trim();
     }
-    const classId = `${yearStr}${department}${section}`;
+    const classId = `${yearStr}-${department}-${section}`;
 
     let fullTimetable: any[] = [];
     try {

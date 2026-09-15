@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     // 1. Fetch the logged in user
     let user = await prisma.user.findUnique({
       where: { email },
-      include: { studentProfile: true }
+      include: { facultyProfile: true }
     });
 
     // Fallback: If not found in User, they might be in UserMode (from older schema)
@@ -30,40 +30,21 @@ export async function GET(request: Request) {
           vmNo: um.vmno,
           email: um.emailid,
           role: um.usermode.toUpperCase(),
-          studentProfile: {
+          facultyProfile: {
              department: "CSE",
-             semester: 5,
-             section: "A",
-             rollNumber: um.vmno
+             designation: "Assistant Professor",
+             vmNo: um.vmno
           }
         } as any;
       }
     }
 
-    if (!user || !user.studentProfile) {
+    if (!user) {
       return NextResponse.json({ 
         success: false, 
-        error: "No student profile found in the database. Please create one in the Admin mode." 
+        error: "No teacher profile found in the database. Please create one in the Admin mode." 
       }, { status: 404 });
     }
-
-    // 2. Extract Details & Compute Class ID (e.g. 2nd year CSE A -> IICSEA)
-    const semester = user.studentProfile.semester || 3; 
-    let yearStr = "I";
-    if (semester === 3 || semester === 4) yearStr = "II";
-    if (semester === 5 || semester === 6) yearStr = "III";
-    if (semester === 7 || semester === 8) yearStr = "IV";
-
-    let rawDept = user.studentProfile.department || "CSE";
-    let department = rawDept;
-    let section = "A";
-
-    const secMatch = rawDept.match(/\(Sec\s+([A-Z])\)/i);
-    if (secMatch) {
-      section = secMatch[1].toUpperCase();
-      department = rawDept.replace(/\s*\(Sec\s+[A-Z]\)\s*/i, "").trim();
-    }
-    const classId = `${yearStr}-${department}-${section}`; // e.g. "II-CSE-C"
 
     // 3. Compute Day Order dynamically
     const baseDate = new Date('2026-09-13T00:00:00'); // Base date was DO 3
@@ -72,7 +53,6 @@ export async function GET(request: Request) {
     
     let current = new Date(baseDate);
     let weekdays = 0;
-    // Iterate to count weekdays between baseDate and today
     while (current < today) {
         current.setDate(current.getDate() + 1);
         const day = current.getDay();
@@ -80,7 +60,6 @@ export async function GET(request: Request) {
             weekdays++;
         }
     }
-    // Handle past dates if server time is earlier than baseDate
     while (current > today) {
         current.setDate(current.getDate() - 1);
         const day = current.getDay();
@@ -89,7 +68,6 @@ export async function GET(request: Request) {
         }
     }
 
-    // Mathematical modulo that handles negative numbers correctly
     const doIndex = (((2 + weekdays) % 5) + 5) % 5; 
     const doNumber = doIndex + 1;
     const roman = ["I", "II", "III", "IV", "V"];
@@ -97,29 +75,38 @@ export async function GET(request: Request) {
     const currentDayOrder = roman[doNumber - 1]; 
     const tomorrowDayOrder = roman[doNumber % 5]; 
 
-    // 4. Fetch the timetable for the student's class and current day order
+    // 4. Fetch the timetable for the teacher (all classes they teach today)
+    // For simplicity, we try to match the user's name against the facultyName field
     let timetable: any[] = [];
     try {
-      timetable = await prisma.$queryRaw`
-        SELECT "id", "classId", "dayOrder", "period", "timeRange", "subjectCode", "subjectName", "facultyName", "roomNo"
-        FROM "TimetableEntry"
-        WHERE "classId" = ${classId} AND "dayOrder" = ${currentDayOrder}
-        ORDER BY "period" ASC
-      `;
+      const searchParts = user.name.split(" ");
+      // We just use the longest part of the name to search, or the first part
+      const searchStr = searchParts.length > 1 ? searchParts[searchParts.length - 1] : user.name;
+      
+      timetable = await prisma.timetableEntry.findMany({
+        where: {
+          dayOrder: currentDayOrder,
+          facultyName: {
+            contains: searchStr,
+            mode: "insensitive"
+          }
+        },
+        orderBy: {
+          period: "asc"
+        }
+      });
     } catch (e) {
-      console.error("Could not fetch timetable entries via raw query", e);
+      console.error("Could not fetch timetable entries", e);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        student: {
+        teacher: {
           name: user.name,
-          vmNo: user.vmNo || user.studentProfile.rollNumber,
-          department: department,
-          semester: semester,
-          section: section,
-          classId: classId
+          vmNo: user.vmNo || user.facultyProfile?.vmNo,
+          department: user.facultyProfile?.department || "CSE",
+          designation: user.facultyProfile?.designation || "Faculty"
         },
         currentDayOrder,
         tomorrowDayOrder,
