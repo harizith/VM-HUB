@@ -17,7 +17,7 @@ const timeRanges = [
   "2.45 - 3.30"
 ]
 
-const timetables = [];
+const timetables: any[] = [];
 
 // Helper to push entries
 function addClassTimetable(classId: string, roomNo: string, grid: string[][], subjects: SubjectMapping) {
