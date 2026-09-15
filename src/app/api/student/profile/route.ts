@@ -82,7 +82,7 @@ export async function PUT(request: Request) {
 
     const email = session.user.email;
     const body = await request.json();
-    const { name, password } = body;
+    const { name, password, department, semester, batch } = body;
 
     const dataToUpdate: any = {};
     if (name) dataToUpdate.name = name;
@@ -91,17 +91,31 @@ export async function PUT(request: Request) {
     const umDataToUpdate: any = {};
     if (password) umDataToUpdate.password = password;
 
-    if (Object.keys(dataToUpdate).length === 0) {
+    const profileDataToUpdate: any = {};
+    if (department) profileDataToUpdate.department = department;
+    if (semester) profileDataToUpdate.semester = parseInt(semester, 10);
+    if (batch) profileDataToUpdate.batch = batch;
+
+    if (Object.keys(dataToUpdate).length === 0 && Object.keys(profileDataToUpdate).length === 0) {
        return NextResponse.json({ success: true, message: "Nothing to update" });
     }
 
     // Attempt to update User
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email }, include: { studentProfile: true } });
     if (user) {
-      await prisma.user.update({
-        where: { email },
-        data: dataToUpdate
-      });
+      if (Object.keys(dataToUpdate).length > 0) {
+        await prisma.user.update({
+          where: { email },
+          data: dataToUpdate
+        });
+      }
+      
+      if (Object.keys(profileDataToUpdate).length > 0 && user.studentProfile) {
+        await prisma.studentProfile.update({
+          where: { userEmail: email },
+          data: profileDataToUpdate
+        });
+      }
     }
 
     // Attempt to update UserMode
