@@ -244,7 +244,7 @@ export default function StudentProfilePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
                 <div>
                   <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>DEPARTMENT</label>
-                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>B.Tech {data.profile.department}</div>
+                  <div style={{ fontSize: "1.1rem", color: "var(--text-main)", fontWeight: 500, marginTop: "0.25rem" }}>{data.profile.department}</div>
                 </div>
                 <div>
                   <label style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>YEAR & SEMESTER</label>

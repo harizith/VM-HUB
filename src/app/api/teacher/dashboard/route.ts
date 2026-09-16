@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { getDayOrderInfo } from "@/utils/dayOrder";
+
 
 export const dynamic = "force-dynamic";
 
@@ -47,33 +49,7 @@ export async function GET(request: Request) {
     }
 
     // 3. Compute Day Order dynamically
-    const baseDate = new Date('2026-09-13T00:00:00'); // Base date was DO 3
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    let current = new Date(baseDate);
-    let weekdays = 0;
-    while (current < today) {
-        current.setDate(current.getDate() + 1);
-        const day = current.getDay();
-        if (day !== 0 && day !== 6) { 
-            weekdays++;
-        }
-    }
-    while (current > today) {
-        current.setDate(current.getDate() - 1);
-        const day = current.getDay();
-        if (day !== 0 && day !== 6) { 
-            weekdays--;
-        }
-    }
-
-    const doIndex = (((2 + weekdays) % 5) + 5) % 5; 
-    const doNumber = doIndex + 1;
-    const roman = ["I", "II", "III", "IV", "V"];
-    
-    const currentDayOrder = roman[doNumber - 1]; 
-    const tomorrowDayOrder = roman[doNumber % 5]; 
+    const { currentDayOrder, tomorrowDayOrder } = await getDayOrderInfo();
 
     // 4. Fetch the timetable for the teacher (all classes they teach today)
     // For simplicity, we try to match the user's name against the facultyName field

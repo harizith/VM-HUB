@@ -18,15 +18,16 @@ export async function GET(request: Request) {
       include: { studentProfile: true }
     });
 
-    if (!user) {
+    // Fallback: If not found in User OR studentProfile is missing, they might be in UserMode (from older schema)
+    if (!user || !user.studentProfile) {
       const um = await prisma.userMode.findUnique({ where: { emailid: email }});
       if (um) {
         user = {
-          name: um.emailid.split("@")[0],
-          vmNo: um.vmno,
+          name: user?.name || um.emailid.split("@")[0],
+          vmNo: user?.vmNo || um.vmno,
           email: um.emailid,
           role: um.usermode.toUpperCase(),
-          status: "ACTIVE",
+          status: user?.status || "ACTIVE",
           studentProfile: {
              department: "CSE",
              semester: 5,
@@ -57,7 +58,9 @@ export async function GET(request: Request) {
         vmNo: user.vmNo || user.studentProfile.rollNumber,
         status: user.status,
         profile: {
-          department: user.studentProfile.department,
+          department: user.studentProfile.department.startsWith("B.E") || user.studentProfile.department.startsWith("B.Tech") 
+                      ? user.studentProfile.department 
+                      : "B.E " + user.studentProfile.department,
           semester: user.studentProfile.semester,
           section: "A", // Default for now until schema update
           batch: user.studentProfile.batch || "2023-2027",

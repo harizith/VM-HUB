@@ -67,6 +67,17 @@ export default function AdminPage() {
   const [isEditingTimetable, setIsEditingTimetable] = useState(false);
   const [loadingTimetable, setLoadingTimetable] = useState(false);
 
+  // Day Order Override State
+  const [currentDayOrderIndex, setCurrentDayOrderIndex] = useState("0");
+  const [updatingDayOrder, setUpdatingDayOrder] = useState(false);
+
+  // Leave Management State
+  const [todayStatus, setTodayStatus] = useState("REGULAR");
+  const [tomorrowStatus, setTomorrowStatus] = useState("REGULAR");
+  const [todayDateStr, setTodayDateStr] = useState("");
+  const [tomorrowDateStr, setTomorrowDateStr] = useState("");
+  const [updatingLeave, setUpdatingLeave] = useState(false);
+
   // Modals State
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeptModal, setShowDeptModal] = useState(false);
@@ -107,17 +118,26 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, dRes, sRes, nRes] = await Promise.all([
+      const [uRes, dRes, sRes, nRes, doRes, lRes] = await Promise.all([
         fetch("/api/admin/users").then((r) => r.json()),
         fetch("/api/admin/departments").then((r) => r.json()),
         fetch("/api/admin/subjects").then((r) => r.json()),
         fetch("/api/admin/notices").then((r) => r.json()),
+        fetch("/api/admin/day-order").then((r) => r.json()),
+        fetch("/api/admin/leaves").then((r) => r.json()),
       ]);
 
       if (uRes.success) setUsers(uRes.users);
       if (dRes.success) setDepts(dRes.departments);
       if (sRes.success) setSubjects(sRes.subjects);
       if (nRes.success) setNotices(nRes.notices);
+      if (doRes.success && doRes.data) setCurrentDayOrderIndex(doRes.data.baseIndex.toString());
+      if (lRes.success && lRes.data) {
+        setTodayStatus(lRes.data.today);
+        setTomorrowStatus(lRes.data.tomorrow);
+        setTodayDateStr(lRes.data.todayDate);
+        setTomorrowDateStr(lRes.data.tomorrowDate);
+      }
     } catch (err) {
       console.error("Error fetching data:", err);
     } finally {
@@ -208,6 +228,40 @@ export default function AdminPage() {
     const res = await fetch(`/api/admin/notices?id=${id}`, { method: "DELETE" }).then((r) => r.json());
     if (res.success) fetchData(); else alert("Error: " + res.error);
   };
+
+  const handleUpdateDayOrder = async () => {
+    setUpdatingDayOrder(true);
+    const res = await fetch("/api/admin/day-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: parseInt(currentDayOrderIndex, 10) })
+    }).then(r => r.json());
+
+    if (res.success) {
+      alert("Day order updated successfully for today.");
+      fetchData();
+    } else {
+      alert("Error updating day order: " + res.error);
+    }
+    setUpdatingDayOrder(false);
+  };
+
+  const handleUpdateLeave = async (target: 'today' | 'tomorrow', status: string) => {
+    setUpdatingLeave(true);
+    const res = await fetch("/api/admin/leaves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, status })
+    }).then(r => r.json());
+
+    if (res.success) {
+      fetchData();
+    } else {
+      alert("Error updating status: " + res.error);
+    }
+    setUpdatingLeave(false);
+  };
+
 
   return (
     <div className="admin-layout">
@@ -567,6 +621,79 @@ export default function AdminPage() {
             {/* TIMETABLE */}
             {activeTab === "timetable" && (
               <div>
+                {/* Day Order Override Section */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Set Today's Day Order</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0.25rem 0 0 0" }}>
+                      Override the auto-calculated day order for today. This recalculates future day orders.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                    <select 
+                      value={currentDayOrderIndex} 
+                      onChange={(e) => setCurrentDayOrderIndex(e.target.value)} 
+                      className="premium-input"
+                    >
+                      <option value="0">Day Order I</option>
+                      <option value="1">Day Order II</option>
+                      <option value="2">Day Order III</option>
+                      <option value="3">Day Order IV</option>
+                      <option value="4">Day Order V</option>
+                    </select>
+                    <button 
+                      onClick={handleUpdateDayOrder} 
+                      className="btn-sky"
+                      disabled={updatingDayOrder}
+                    >
+                      {updatingDayOrder ? "Updating..." : "Update Day Order"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Leave and Working Day Management Section */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "2rem", backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Leave & Working Day Management</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0.25rem 0 0 0" }}>
+                      Mark today or tomorrow as a leave to pause the day order, or as a working day to force it to advance.
+                    </p>
+                  </div>
+                  
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "0.5rem" }}>
+                    {/* Today */}
+                    <div style={{ padding: "1rem", border: "1px solid var(--border-subtle)", borderRadius: "8px", backgroundColor: "var(--bg-input)" }}>
+                      <div style={{ fontSize: "0.9rem", fontWeight: "600", marginBottom: "0.5rem" }}>Today ({todayDateStr})</div>
+                      <select 
+                        value={todayStatus} 
+                        onChange={(e) => handleUpdateLeave('today', e.target.value)} 
+                        className="premium-input"
+                        disabled={updatingLeave}
+                        style={{ width: "100%", padding: "0.5rem", borderRadius: "6px" }}
+                      >
+                        <option value="REGULAR">Regular (Auto)</option>
+                        <option value="LEAVE">Leave / Holiday</option>
+                        <option value="WORKING_DAY">Working Day (Make-up)</option>
+                      </select>
+                    </div>
+                    {/* Tomorrow */}
+                    <div style={{ padding: "1rem", border: "1px solid var(--border-subtle)", borderRadius: "8px", backgroundColor: "var(--bg-input)" }}>
+                      <div style={{ fontSize: "0.9rem", fontWeight: "600", marginBottom: "0.5rem" }}>Tomorrow ({tomorrowDateStr})</div>
+                      <select 
+                        value={tomorrowStatus} 
+                        onChange={(e) => handleUpdateLeave('tomorrow', e.target.value)} 
+                        className="premium-input"
+                        disabled={updatingLeave}
+                        style={{ width: "100%", padding: "0.5rem", borderRadius: "6px" }}
+                      >
+                        <option value="REGULAR">Regular (Auto)</option>
+                        <option value="LEAVE">Leave / Holiday</option>
+                        <option value="WORKING_DAY">Working Day (Make-up)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
                   <div>
                     <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Class Timetable Management</h3>
