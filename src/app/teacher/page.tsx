@@ -59,7 +59,7 @@ export default function TeacherDashboardPage() {
     <main className="student-main">
       <header className="student-header">
         <div>
-          <div className="student-date">{dateStr} • Day Order {data?.currentDayOrder || "III"}</div>
+          <div className="student-date">{dateStr} • {data?.currentDayOrder === "Leave" ? "Leave / Holiday" : `Day Order ${data?.currentDayOrder || "III"}`}</div>
           <h1>Welcome back, {data?.teacher?.name ? data.teacher.name : "Faculty"}</h1>
         </div>
         <div className="student-course-info">
@@ -122,11 +122,15 @@ export default function TeacherDashboardPage() {
       </div>
 
       {/* Today's Timetable */}
-      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>My Schedule (Day Order {data?.currentDayOrder})</h3>
+      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>My Schedule {data?.currentDayOrder === "Leave" ? "" : `(Day Order ${data?.currentDayOrder})`}</h3>
       
       {(!data?.timetable || data.timetable.length === 0) ? (
         <div style={{ padding: "2rem", backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px dashed var(--border-subtle)", textAlign: "center", color: "var(--text-muted)", marginBottom: "2rem" }}>
-          You have no classes scheduled for Day Order {data?.currentDayOrder}. Enjoy your free day!
+          {data?.currentDayOrder === "Leave" ? (
+            <>Enjoy your leave! No classes scheduled for today.</>
+          ) : (
+            <>You have no classes scheduled for Day Order {data?.currentDayOrder}. Enjoy your free day!</>
+          )}
         </div>
       ) : (
         <div className="student-timetable-scroll">

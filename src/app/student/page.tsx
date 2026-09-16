@@ -59,11 +59,11 @@ export default function DashboardPage() {
     <main className="student-main">
       <header className="student-header">
         <div>
-          <div className="student-date">{dateStr} • Day Order {data?.currentDayOrder || "III"}</div>
+          <div className="student-date">{dateStr} • {data?.currentDayOrder === "Leave" ? "Leave / Holiday" : `Day Order ${data?.currentDayOrder || "III"}`}</div>
           <h1>Hey {data?.student?.name ? data.student.name : "Student"}</h1>
         </div>
         <div className="student-course-info">
-          <strong>B.Tech {data?.student?.department || "CSE"}</strong>
+          <strong>{data?.student?.department || "B.E CSE"}</strong>
           Semester {data?.student?.semester || 5} - Section {data?.student?.section || "A"}
         </div>
       </header>
@@ -123,12 +123,18 @@ export default function DashboardPage() {
       </div>
 
       {/* Today's Timetable */}
-      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>Today's timetable (Day Order {data?.currentDayOrder})</h3>
+      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>Today's timetable {data?.currentDayOrder === "Leave" ? "" : `(Day Order ${data?.currentDayOrder})`}</h3>
       
       {(!data?.timetable || data.timetable.length === 0) ? (
         <div style={{ padding: "2rem", backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px dashed var(--border-subtle)", textAlign: "center", color: "var(--text-muted)", marginBottom: "2rem" }}>
-          No timetable found in the database for your class ({data?.student?.classId}) on Day Order {data?.currentDayOrder}. <br />
-          <strong>(Please add timetable entries in the Admin Panel to see them here).</strong>
+          {data?.currentDayOrder === "Leave" ? (
+            <>Enjoy your leave! No timetable for today.</>
+          ) : (
+            <>
+              No timetable found in the database for your class ({data?.student?.classId}) on Day Order {data?.currentDayOrder}. <br />
+              <strong>(Please add timetable entries in the Admin Panel to see them here).</strong>
+            </>
+          )}
         </div>
       ) : (
         <div className="student-timetable-scroll">

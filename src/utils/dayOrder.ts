@@ -1,72 +1,110 @@
-/**
- * Configuration for the Day Order calculation.
- * In a real application, these values would be fetched from the database (Prisma).
- */
-export interface SemesterConfig {
-  startDate: string; // ISO Date string, e.g., "2024-08-01"
-  holidays: string[]; // Array of ISO Date strings
-  makeUpDays: string[]; // Array of ISO Date strings (weekends or holidays turned into working days)
-  maxDayOrder: number; // Usually 5 or 6 depending on the college schedule
-}
+import prisma from "@/lib/prisma";
 
-/**
- * Calculates the current Day Order deterministically.
- * 
- * @param targetDate The date to calculate the Day Order for.
- * @param config The semester configuration (start date, holidays, etc.).
- * @returns The Day Order (1 to maxDayOrder), or 0 if it's a holiday/weekend.
- */
-export function calculateDayOrder(targetDate: Date, config: SemesterConfig): number {
-  const start = new Date(config.startDate);
-  start.setHours(0, 0, 0, 0);
+export async function getDayOrderInfo() {
+  let baseDateStr = '2026-09-13T00:00:00';
+  let baseIndex = 2; // Day Order III (0-based: I=0, II=1, III=2, IV=3, V=4)
   
-  const target = new Date(targetDate);
-  target.setHours(0, 0, 0, 0);
+  let holidays: string[] = [];
+  let workingWeekends: string[] = [];
 
-  // If the target date is before the start of the semester, no day order
-  if (target < start) return 0;
+  try {
+    const settings = await prisma.systemSetting.findMany({
+      where: {
+        key: { in: ['DAY_ORDER_BASE_DATE', 'DAY_ORDER_BASE_INDEX', 'HOLIDAYS', 'WORKING_WEEKENDS'] }
+      }
+    });
 
-  let workingDaysCount = 0;
-  let currentDate = new Date(start);
+    const baseDateSetting = settings.find(s => s.key === 'DAY_ORDER_BASE_DATE');
+    const baseIndexSetting = settings.find(s => s.key === 'DAY_ORDER_BASE_INDEX');
+    const holidaysSetting = settings.find(s => s.key === 'HOLIDAYS');
+    const workingWeekendsSetting = settings.find(s => s.key === 'WORKING_WEEKENDS');
 
-  // Helper to check if a date string is in an array of date strings
-  const isDateInArray = (date: Date, dateArray: string[]) => {
-    const dateString = date.toISOString().split('T')[0];
-    return dateArray.includes(dateString);
+    if (baseDateSetting) baseDateStr = baseDateSetting.value;
+    if (baseIndexSetting) baseIndex = parseInt(baseIndexSetting.value, 10);
+    
+    if (holidaysSetting) {
+      try { holidays = JSON.parse(holidaysSetting.value); } catch(e) {}
+    }
+    if (workingWeekendsSetting) {
+      try { workingWeekends = JSON.parse(workingWeekendsSetting.value); } catch(e) {}
+    }
+  } catch (e) {
+    console.error("Failed to fetch day order settings", e);
+  }
+
+  const baseDate = new Date(baseDateStr);
+  baseDate.setHours(0, 0, 0, 0);
+
+  const now = new Date();
+  
+  // Shift "today" to the next day if the current time is 4:00 PM (16:00) or later
+  if (now.getHours() >= 16) {
+    now.setDate(now.getDate() + 1);
+  }
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const formatDate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
-  // Iterate from the start date up to and including the target date
-  while (currentDate <= target) {
-    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6; // 0 = Sunday, 6 = Saturday
-    const isHoliday = isDateInArray(currentDate, config.holidays);
-    const isMakeUpDay = isDateInArray(currentDate, config.makeUpDays);
+  const isWorkingDay = (d: Date) => {
+    const dateStr = formatDate(d);
+    const day = d.getDay();
+    const isWeekend = day === 0 || day === 6;
+    
+    if (holidays.includes(dateStr)) return false;
+    if (workingWeekends.includes(dateStr)) return true;
+    return !isWeekend;
+  };
 
-    // It's a working day if it's a make-up day, OR (it's not a weekend AND it's not a holiday)
-    const isWorkingDay = isMakeUpDay || (!isWeekend && !isHoliday);
-
-    if (isWorkingDay) {
-      workingDaysCount++;
-    }
-
-    // Move to the next day
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  // If the target date itself is not a working day, return 0 (no day order)
-  const isTargetWeekend = target.getDay() === 0 || target.getDay() === 6;
-  const isTargetHoliday = isDateInArray(target, config.holidays);
-  const isTargetMakeUpDay = isDateInArray(target, config.makeUpDays);
+  let current = new Date(baseDate);
+  let weekdays = 0;
   
-  if (!isTargetMakeUpDay && (isTargetWeekend || isTargetHoliday)) {
-    return 0;
+  // Count working days between base date and today
+  while (current < today) {
+    current.setDate(current.getDate() + 1);
+    if (isWorkingDay(current)) {
+      weekdays++;
+    }
+  }
+  // Handle past dates if server time is earlier than baseDate
+  while (current > today) {
+    current.setDate(current.getDate() - 1);
+    if (isWorkingDay(current)) {
+      weekdays--;
+    }
   }
 
-  // Calculate the rotating day order
-  // E.g. if maxDayOrder is 5, then working day 1 is Day 1, day 6 is Day 1, day 7 is Day 2, etc.
-  let currentDayOrder = workingDaysCount % config.maxDayOrder;
-  if (currentDayOrder === 0) {
-    currentDayOrder = config.maxDayOrder; // E.g., working day 5 % 5 = 0, which should be Day 5
+  const roman = ["I", "II", "III", "IV", "V"];
+
+  // Calculate Today
+  let currentDayOrder = "Leave";
+  let doIndex = 0;
+  if (isWorkingDay(today)) {
+    doIndex = (((baseIndex + weekdays) % 5) + 5) % 5;
+    currentDayOrder = roman[doIndex];
   }
 
-  return currentDayOrder;
+  // Calculate Tomorrow
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  let tomorrowDayOrder = "Leave";
+  if (isWorkingDay(tomorrow)) {
+    // If today is a working day, tomorrow's index is doIndex + 1
+    // If today is a leave, tomorrow's index is the same as the "pending" index
+    const tomorrowIndex = (((baseIndex + weekdays + (isWorkingDay(today) ? 1 : 0)) % 5) + 5) % 5;
+    tomorrowDayOrder = roman[tomorrowIndex];
+  }
+
+  return {
+    currentDayOrder,
+    tomorrowDayOrder,
+    doIndex: currentDayOrder === "Leave" ? -1 : doIndex 
+  };
 }
