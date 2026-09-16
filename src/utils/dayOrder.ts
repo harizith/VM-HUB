@@ -35,9 +35,11 @@ export async function getDayOrderInfo() {
   const baseDate = new Date(baseDateStr);
   baseDate.setHours(0, 0, 0, 0);
 
-  const now = new Date();
+  // Use IST (Asia/Kolkata) explicitly so it works correctly on Vercel (which uses UTC by default)
+  const istTimeStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const now = new Date(istTimeStr);
   
-  // Shift "today" to the next day if the current time is 4:00 PM (16:00) or later
+  // Shift "today" to the next day if the current IST time is 4:00 PM (16:00) or later
   if (now.getHours() >= 16) {
     now.setDate(now.getDate() + 1);
   }
