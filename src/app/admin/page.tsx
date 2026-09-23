@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight } from "lucide-react";
+import AdminAgentChat from "@/components/AdminAgentChat";
 
 interface UserItem {
   id: string;
@@ -261,6 +262,8 @@ export default function AdminPage() {
     }
     setUpdatingLeave(false);
   };
+
+
 
 
   return (
@@ -1227,6 +1230,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      <AdminAgentChat onTimetableUpdated={fetchData} />
     </div>
   );
 }
