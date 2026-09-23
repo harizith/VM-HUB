@@ -196,10 +196,73 @@ export async function POST(request: Request) {
       });
     }
 
+    // 5. DYNAMIC SQL / MODEL FALLBACK (For unexpected queries)
+    const modelMap: Record<string, string> = {
+      'user': 'User', 'users': 'User', 'people': 'User', 
+      'department': 'Department', 'departments': 'Department', 'dept': 'Department',
+      'subject': 'Subject', 'subjects': 'Subject', 'course': 'Subject', 'courses': 'Subject',
+      'notice': 'Notice', 'notices': 'Notice', 'announcement': 'Notice',
+      'timetable': 'TimetableEntry', 'schedule': 'TimetableEntry'
+    };
+
+    let targetModel = "";
+    const words = lowerQuery.replace(/[^\w\s]/g, '').split(' ');
+    for (const word of words) {
+      if (modelMap[word]) {
+        targetModel = modelMap[word];
+        break;
+      }
+    }
+
+    if (targetModel) {
+      const isCount = /count|how many|number of/.test(lowerQuery);
+      
+      // We found an unexpected model mention! Let's dynamically query it.
+      const delegateName = targetModel.charAt(0).toLowerCase() + targetModel.slice(1);
+      const prismaDelegate = (prisma as any)[delegateName];
+      
+      if (prismaDelegate) {
+        let whereClause: any = undefined;
+        let sqlWhere = "";
+        
+        // Advanced NLP: Detect "where X is Y" or "with X Y"
+        const whereMatch = lowerQuery.match(/(?:where|with)\s+(\w+)\s+(?:is|equals|=)?\s*"?(\w+)"?/i);
+        if (whereMatch) {
+           const field = whereMatch[1];
+           const value = whereMatch[2];
+           
+           // For Prisma, we'll try a generic string search (could fail on Ints, but good for local heuristic)
+           whereClause = { [field]: { equals: value } };
+           sqlWhere = ` WHERE "${field}" = '${value}'`;
+        }
+
+        try {
+          if (isCount) {
+            const count = await prismaDelegate.count({ where: whereClause });
+            return NextResponse.json({
+              success: true,
+              reply: `Dynamically executed: SELECT COUNT(*) FROM "${targetModel}"${sqlWhere};\n\nResult: ${count}`,
+              data: { count, sql: `SELECT COUNT(*) FROM "${targetModel}"${sqlWhere};` }
+            });
+          } else {
+            const records = await prismaDelegate.findMany({ where: whereClause, take: 20 });
+            return NextResponse.json({
+              success: true,
+              reply: `Dynamically executed: SELECT * FROM "${targetModel}"${sqlWhere} LIMIT 20;\n\n(Found ${records.length} records)`,
+              data: records
+            });
+          }
+        } catch (e: any) {
+           // If the dynamic query fails (e.g. invalid field name), it will fall through to default
+           console.error("Dynamic SQL heuristic failed:", e.message);
+        }
+      }
+    }
+
     // DEFAULT RESPONSE
     return NextResponse.json({
       success: true,
-      reply: "I couldn't quite extract the details from that. Try asking questions like 'Which teacher has CSE A on Monday morning?' or 'Get me the schedule for IT B in period 1'.",
+      reply: "I couldn't quite extract the details from that. Try asking questions like 'Which teacher has CSE A on Monday morning?' or 'count users where role is FACULTY'.",
       data: { extracted: { days, numbers, people, classIdFilter, intent: "UNKNOWN" } }
     });
 
