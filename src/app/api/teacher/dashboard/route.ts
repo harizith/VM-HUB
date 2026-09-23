@@ -55,9 +55,12 @@ export async function GET(request: Request) {
     // For simplicity, we try to match the user's name against the facultyName field
     let timetable: any[] = [];
     try {
-      const searchParts = user.name.split(" ");
-      // We just use the longest part of the name to search, or the first part
-      const searchStr = searchParts.length > 1 ? searchParts[searchParts.length - 1] : user.name;
+      const words = user.name.split(/[\s.]+/);
+      // We just use the longest part of the name to search, this bypasses issues like "Mr. P.Karthick" matching "Karthick/Prabhakaran"
+      let searchStr = "";
+      for (const w of words) {
+        if (w.length > searchStr.length) searchStr = w;
+      }
       
       timetable = await prisma.timetableEntry.findMany({
         where: {
