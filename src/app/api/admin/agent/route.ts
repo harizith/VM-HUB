@@ -64,13 +64,19 @@ export async function POST(request: Request) {
       classIdFilter = sec ? `${cls}-${sec}` : cls;
     }
 
+    const ignoreWords = ['name', 'list', 'schedule', 'timetable', 'who', 'where', 'has', 'with', 'for', 'in', 'on', 'all', 'every', 'details', 'info', 'the', 'a', 'an'];
+
     // Faculty Name Extraction
     let nameQuery = "";
     if (people.length > 0) {
       nameQuery = people[0];
     } else if (isFaculty) {
+      const letterMatch = lowerQuery.match(/(?:letter|starts with|ends with)\s+([a-z])\b/i);
       const nameMatch = doc.match('(faculty|teacher|staff|professor) .').terms(1).text();
-      if (nameMatch && nameMatch.length > 2) {
+      
+      if (letterMatch) {
+        nameQuery = letterMatch[1];
+      } else if (nameMatch && nameMatch.length > 2 && !ignoreWords.includes(nameMatch)) {
         nameQuery = nameMatch;
       }
     }
@@ -79,7 +85,9 @@ export async function POST(request: Request) {
     let subjectQuery = "";
     if (isSubject) {
       const subjMatch = doc.match('(subject|course) .').terms(1).text();
-      if (subjMatch) subjectQuery = subjMatch;
+      if (subjMatch && subjMatch.length > 2 && !ignoreWords.includes(subjMatch)) {
+        subjectQuery = subjMatch;
+      }
     }
 
     // ============================================
