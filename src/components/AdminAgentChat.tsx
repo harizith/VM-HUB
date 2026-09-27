@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageSquare, X, Send, Database, Loader2, Paperclip } from "lucide-react";
+import * as XLSX from "xlsx";
 
 export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpdated?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,8 +11,9 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [pendingConflicts, setPendingConflicts] = useState<any[]>([]);
+  const [attachedData, setAttachedData] = useState<any[] | null>(null);
+  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -22,49 +24,32 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
     scrollToBottom();
   }, [messages, isOpen]);
 
-  useEffect(() => {
-    if (pendingConflicts && pendingConflicts.length > 0) {
-      setIsOpen(true);
-      setIsConfirming(true);
-      setMessages(prev => [...prev, {
-        role: "agent",
-        content: `I found ${pendingConflicts.length} records that conflict with existing timetable data (e.g. different subject or faculty). Do you want me to **update** the database with these new records, or **skip** them?`,
-        data: { conflicts: pendingConflicts }
-      }]);
-    }
-  }, [pendingConflicts]);
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setMessages(prev => [...prev, { role: "user", content: `(Uploaded ${file.name})` }]);
+    setAttachedFileName(file.name);
     setIsLoading(true);
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      const res = await fetch("/api/admin/timetable/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        let msg = `Inserted ${data.count} new records. Skipped ${data.skippedCount} exact duplicates.`;
-        if (data.conflicts && data.conflicts.length > 0) {
-           setPendingConflicts(data.conflicts);
-        } else {
-           setMessages(prev => [...prev, { role: "agent", content: msg + " No conflicts found." }]);
-           if (onTimetableUpdated) onTimetableUpdated();
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const bstr = evt.target?.result;
+        if (bstr) {
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws);
+          setAttachedData(data);
+          setMessages(prev => [...prev, { role: "agent", content: `(Attached ${file.name} with ${data.length} rows. You can now ask me to import or process this data!)` }]);
         }
-      } else {
-        setMessages(prev => [...prev, { role: "agent", content: "Error uploading file: " + (data.error || JSON.stringify(data.details)) }]);
-      }
+        setIsLoading(false);
+      };
+      reader.readAsBinaryString(file);
     } catch (err) {
-      setMessages(prev => [...prev, { role: "agent", content: "Failed to upload excel file." }]);
-    } finally {
+      setMessages(prev => [...prev, { role: "agent", content: "Failed to parse excel file." }]);
       setIsLoading(false);
+    } finally {
       if (e.target) e.target.value = '';
     }
   };
@@ -76,44 +61,16 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
     setInput("");
     setIsLoading(true);
 
-    if (isConfirming) {
-       const lowerMsg = userMessage.toLowerCase();
-       if (lowerMsg.includes("update") || lowerMsg.includes("yes")) {
-         try {
-           const res = await fetch("/api/admin/timetable/confirm", {
-             method: "POST",
-             headers: { "Content-Type": "application/json" },
-             body: JSON.stringify({ conflicts: pendingConflicts })
-           });
-           const data = await res.json();
-           if (data.success) {
-             setMessages(prev => [...prev, { role: "agent", content: `Successfully updated ${data.count} records.` }]);
-             if (onTimetableUpdated) onTimetableUpdated();
-           } else {
-             setMessages(prev => [...prev, { role: "agent", content: `Error updating: ${data.error}` }]);
-           }
-         } catch (e) {
-           setMessages(prev => [...prev, { role: "agent", content: "Failed to confirm updates." }]);
-         }
-       } else if (lowerMsg.includes("skip") || lowerMsg.includes("no")) {
-         setMessages(prev => [...prev, { role: "agent", content: "Skipped conflicting records." }]);
-       } else {
-         setMessages(prev => [...prev, { role: "agent", content: "Please reply with 'update' to apply the changes, or 'skip' to ignore them." }]);
-         setIsLoading(false);
-         return;
-       }
-       
-       setIsConfirming(false);
-       setPendingConflicts([]);
-       setIsLoading(false);
-       return;
-    }
-
     try {
+      const payload: any = { query: userMessage };
+      if (attachedData) {
+        payload.attachedData = attachedData;
+      }
+
       const res = await fetch("/api/admin/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMessage })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       
@@ -122,6 +79,16 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
         content: data.reply || "Done.", 
         data: data.data 
       }]);
+      
+      // Clear attached data after sending
+      if (attachedData) {
+        setAttachedData(null);
+        setAttachedFileName(null);
+      }
+      
+      if (data.success && onTimetableUpdated && data.data?.isWrite) {
+        onTimetableUpdated();
+      }
     } catch (error) {
       setMessages(prev => [...prev, { role: "agent", content: "Error connecting to local agent." }]);
     } finally {
@@ -207,11 +174,12 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
               color: m.role === "user" ? "white" : "var(--text-main)",
               border: m.role === "agent" ? "1px solid var(--border-subtle)" : "none",
               fontSize: "0.9rem",
-              lineHeight: "1.4"
+              lineHeight: "1.4",
+              whiteSpace: "pre-wrap"
             }}>
               {m.content}
             </div>
-            {m.data && (
+            {m.data && m.data.sqlQuery && (
               <div style={{ 
                 marginTop: "0.5rem", 
                 display: "flex", 
@@ -221,33 +189,10 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
                 overflowY: "auto",
                 paddingRight: "0.25rem"
               }}>
-                {Array.isArray(m.data) ? (
-                  m.data.map((item, idx) => (
-                    <div key={idx} style={{ padding: "0.5rem", backgroundColor: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
-                      {typeof item === 'object' && item !== null ? (
-                        Object.entries(item).map(([key, val]) => (
-                          <div key={key} style={{ fontSize: "0.8rem", marginBottom: "0.25rem", color: "var(--text-main)" }}>
-                            <strong style={{ color: "var(--royal-blue)" }}>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {typeof val === 'object' ? JSON.stringify(val) : String(val)}
-                          </div>
-                        ))
-                      ) : (
-                        <div style={{ fontSize: "0.8rem", color: "var(--text-main)" }}>{String(item)}</div>
-                      )}
-                    </div>
-                  ))
-                ) : typeof m.data === 'object' && m.data !== null ? (
-                  <div style={{ padding: "0.5rem", backgroundColor: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
-                    {Object.entries(m.data).map(([key, val]) => (
-                      <div key={key} style={{ fontSize: "0.8rem", marginBottom: "0.25rem", color: "var(--text-main)" }}>
-                        <strong style={{ color: "var(--royal-blue)" }}>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {typeof val === 'object' ? JSON.stringify(val) : String(val)}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: "0.8rem", padding: "0.5rem", backgroundColor: "var(--bg-input)", borderRadius: "8px" }}>
-                    {String(m.data)}
-                  </div>
-                )}
+                <div style={{ padding: "0.5rem", backgroundColor: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
+                   <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-muted)", marginBottom: "4px" }}>SQL Executed:</div>
+                   <div style={{ fontSize: "0.8rem", color: "var(--royal-blue)", fontFamily: "monospace" }}>{m.data.sqlQuery}</div>
+                </div>
               </div>
             )}
           </div>
@@ -259,6 +204,18 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Attached File Pill */}
+      {attachedFileName && (
+        <div style={{ padding: "0.5rem 1rem", backgroundColor: "var(--bg-main)", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--royal-blue)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Paperclip size={14} /> Attached: {attachedFileName}
+          </div>
+          <button onClick={() => { setAttachedData(null); setAttachedFileName(null); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <div style={{ padding: "1rem", borderTop: "1px solid var(--border-subtle)", display: "flex", gap: "0.5rem", backgroundColor: "var(--bg-card)" }}>
