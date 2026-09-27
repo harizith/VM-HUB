@@ -54,82 +54,111 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, reply: 'No query provided.' }, { status: 400 });
     }
 
-    const prompt1 = `
-You are an AI assistant for a college administration system acting as an intelligent SQL generator.
+    const messages: any[] = [
+      {
+        role: 'system',
+        content: `You are a fully autonomous AI assistant for a college administration system.
+You have the ability to search, traverse, edit, update, and delete database records using the 'execute_sql' tool.
 Here is the PostgreSQL database schema for the application:
 
 ${schemaStr}
 
-User Query: "${query}"
-
 Instructions:
-Determine if the user wants to read or write to the database. If so, generate the exact PostgreSQL query to execute.
-Return ONLY a JSON object with:
-- sqlQuery: The PostgreSQL query string (or null if no database action is needed). Use double quotes around table and column names where appropriate (e.g. "User", "TimetableEntry", "name", "role").
-- isWrite: Boolean, true if the query modifies data (INSERT, UPDATE, DELETE).
-- tone: Any specific tone requested by the user (e.g., "pirate", "formal", "friendly"). Default to "normal".
+1. Always adopt any specific tone requested by the user.
+2. If the user asks to fetch or modify data, immediately use the 'execute_sql' tool.
+3. Be helpful, concise, and provide natural language responses.`
+      },
+      {
+        role: 'user',
+        content: query
+      }
+    ];
 
-Example response:
-{
-  "sqlQuery": "SELECT * FROM \\"User\\" WHERE role = 'FACULTY' LIMIT 5;",
-  "isWrite": false,
-  "tone": "normal"
-}
-`;
+    const tools = [
+      {
+        type: 'function',
+        function: {
+          name: 'execute_sql',
+          description: 'Executes a raw PostgreSQL query to read or write data. Use double quotes around table names (e.g. "User", "TimetableEntry").',
+          parameters: {
+            type: 'object',
+            properties: {
+              sqlQuery: {
+                type: 'string',
+                description: 'The PostgreSQL query string to execute.'
+              },
+              isWrite: {
+                type: 'boolean',
+                description: 'Set to true if the query modifies data (INSERT, UPDATE, DELETE).'
+              }
+            },
+            required: ['sqlQuery', 'isWrite']
+          }
+        }
+      }
+    ];
 
     const completion1 = await groq.chat.completions.create({
-      messages: [ { role: 'system', content: prompt1 } ],
+      messages,
       model: 'openai/gpt-oss-120b',
-      temperature: 0,
-      response_format: { type: 'json_object' }
+      tools,
+      tool_choice: 'auto'
     });
 
-    const step1Content = completion1.choices[0]?.message?.content || '{}';
-    const parsed = JSON.parse(step1Content);
-    const { sqlQuery, isWrite, tone } = parsed;
+    const responseMessage = completion1.choices[0]?.message;
 
-    let dbResult: any = "No database action was executed.";
-    let errorStr: string | null = null;
-    
-    if (sqlQuery) {
-      try {
-        if (isWrite) {
-          const affected = await prisma.$executeRawUnsafe(sqlQuery);
-          dbResult = `[Query executed successfully. Affected ${affected} rows]`;
-        } else {
-          const records = await prisma.$queryRawUnsafe(sqlQuery);
-          dbResult = records;
+    // Check if the model decided to call the database tool
+    if (responseMessage?.tool_calls?.length) {
+      const toolCall = responseMessage.tool_calls[0];
+      
+      if (toolCall.function.name === 'execute_sql') {
+        const { sqlQuery, isWrite } = JSON.parse(toolCall.function.arguments);
+        
+        let dbResult: any;
+        let errorStr: string | null = null;
+        
+        try {
+          if (isWrite) {
+            const affected = await prisma.$executeRawUnsafe(sqlQuery);
+            dbResult = `[Query executed successfully. Affected ${affected} rows]`;
+          } else {
+            dbResult = await prisma.$queryRawUnsafe(sqlQuery);
+          }
+        } catch (err: any) {
+          errorStr = err.message;
+          dbResult = `Database error: ${errorStr}`;
+          console.error("SQL Error:", errorStr, "Query:", sqlQuery);
         }
-      } catch (err: any) {
-        errorStr = err.message;
-        dbResult = `Database error: ${errorStr}`;
-        console.error("SQL Error:", errorStr, "Query:", sqlQuery);
+
+        // Add the assistant's tool call request to the message history
+        messages.push(responseMessage);
+        
+        // Add the tool execution result to the message history
+        messages.push({
+          tool_call_id: toolCall.id,
+          role: 'tool',
+          name: 'execute_sql',
+          content: typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult)
+        });
+
+        // Let the AI generate the final response based on the DB result
+        const completion2 = await groq.chat.completions.create({
+          messages,
+          model: 'openai/gpt-oss-120b'
+        });
+
+        return NextResponse.json({
+          success: !errorStr,
+          reply: completion2.choices[0]?.message?.content || "I couldn't generate a final response.",
+          data: { sqlQuery, isWrite, dbResult }
+        });
       }
     }
 
-    const prompt2 = `
-You are a helpful college administration AI assistant.
-User Query: "${query}"
-Tone requested: ${tone || 'normal'}
-
-Action Result: 
-${JSON.stringify(dbResult, null, 2)}
-
-Provide a natural language response back to the user addressing their query based on the Action Result. Adopt the requested tone perfectly. If there was a database error, politely inform them. Do not include raw JSON or SQL in the response to the user, just answer naturally.
-`;
-
-    const completion2 = await groq.chat.completions.create({
-      messages: [ { role: 'system', content: prompt2 } ],
-      model: 'openai/gpt-oss-120b',
-      temperature: 0.7
-    });
-
-    const finalReply = completion2.choices[0]?.message?.content || "I couldn't generate a response.";
-
+    // If no tool was called, return the AI's direct response
     return NextResponse.json({
-      success: !errorStr,
-      reply: finalReply,
-      data: { sqlQuery, isWrite, tone, dbResult }
+      success: true,
+      reply: responseMessage?.content || "I couldn't generate a response."
     });
 
   } catch (error: any) {
