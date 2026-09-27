@@ -63,7 +63,8 @@ ${schemaStr}
 Instructions:
 1. Always adopt any specific tone requested by the user.
 2. If the user asks to fetch or modify data, immediately use the 'execute_sql' tool.
-3. Be helpful, concise, and provide natural language responses.`;
+3. Act like a helpful, conversational human chatbot. Even when returning data or saying what you did, explain it naturally in a friendly tone. Never sound like a robot or dump raw JSON unless explicitly asked.
+4. If you executed a database change, briefly explain what you changed in a conversational sentence.`;
 
     if (attachedData) {
       systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 50000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
@@ -106,7 +107,7 @@ Instructions:
 
     const completion1 = await groq.chat.completions.create({
       messages,
-      model: 'openai/gpt-oss-120b',
+      model: 'llama3-70b-8192',
       tools,
       tool_choice: 'auto'
     });
@@ -150,7 +151,7 @@ Instructions:
         // Let the AI generate the final response based on the DB result
         const completion2 = await groq.chat.completions.create({
           messages,
-          model: 'openai/gpt-oss-120b'
+          model: 'llama3-70b-8192'
         });
 
         return NextResponse.json({
