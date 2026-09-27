@@ -48,16 +48,13 @@ model Notice {
 
 export async function POST(request: Request) {
   try {
-    const { query } = await request.json();
+    const { query, attachedData } = await request.json();
     
     if (!query) {
       return NextResponse.json({ success: false, reply: 'No query provided.' }, { status: 400 });
     }
 
-    const messages: any[] = [
-      {
-        role: 'system',
-        content: `You are a fully autonomous AI assistant for a college administration system.
+    let systemContent = `You are a fully autonomous AI assistant for a college administration system.
 You have the ability to search, traverse, edit, update, and delete database records using the 'execute_sql' tool.
 Here is the PostgreSQL database schema for the application:
 
@@ -66,7 +63,16 @@ ${schemaStr}
 Instructions:
 1. Always adopt any specific tone requested by the user.
 2. If the user asks to fetch or modify data, immediately use the 'execute_sql' tool.
-3. Be helpful, concise, and provide natural language responses.`
+3. Be helpful, concise, and provide natural language responses.`;
+
+    if (attachedData) {
+      systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 50000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
+    }
+
+    const messages: any[] = [
+      {
+        role: 'system',
+        content: systemContent
       },
       {
         role: 'user',
@@ -79,13 +85,13 @@ Instructions:
         type: 'function',
         function: {
           name: 'execute_sql',
-          description: 'Executes a raw PostgreSQL query to read or write data. Use double quotes around table names (e.g. "User", "TimetableEntry").',
+          description: 'Executes a raw PostgreSQL query to read or write data. Use double quotes around table names (e.g. "User", "TimetableEntry"). You can run multiple queries separated by semicolons.',
           parameters: {
             type: 'object',
             properties: {
               sqlQuery: {
                 type: 'string',
-                description: 'The PostgreSQL query string to execute.'
+                description: 'The PostgreSQL query string to execute. Can be a batch of statements separated by semicolons.'
               },
               isWrite: {
                 type: 'boolean',
