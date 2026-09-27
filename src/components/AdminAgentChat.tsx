@@ -6,7 +6,7 @@ import { MessageSquare, X, Send, Database, Loader2, Paperclip } from "lucide-rea
 export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpdated?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "agent"; content: string; data?: any }[]>([
-    { role: "agent", content: "Hello! I am your local database agent. Ask me to fetch or search data (e.g., 'fetch timetable for CSE A', 'search faculty Smith')." }
+    { role: "agent", content: "Hello! I am your fully autonomous AI agent. Ask me to add, edit, update, delete, or search data (e.g., 'Update John to be an ADMIN', 'Delete all notices from yesterday')." }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -281,7 +281,7 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSend()}
-          placeholder="Ask me to search or fetch..."
+          placeholder="Ask me to add, update, delete, or fetch data..."
           style={{
             flex: 1,
             padding: "0.75rem",
