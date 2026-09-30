@@ -62,7 +62,15 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
     setIsLoading(true);
 
     try {
-      const payload: any = { query: userMessage };
+      const payload: any = { 
+        query: userMessage,
+        history: messages
+          .filter(m => !m.content.startsWith("(Attached"))
+          .map(m => ({
+            role: m.role === "agent" ? "assistant" : "user",
+            content: m.content
+          }))
+      };
       if (attachedData) {
         payload.attachedData = attachedData;
       }
