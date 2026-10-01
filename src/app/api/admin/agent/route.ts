@@ -129,7 +129,7 @@ Instructions:
 
     const completion1 = await groq.chat.completions.create({
       messages,
-      model: 'openai/gpt-oss-120b',
+      model: 'llama-3.1-70b-versatile',
       tools,
       tool_choice: 'auto'
     });
@@ -173,7 +173,7 @@ Instructions:
         // Let the AI generate the final response based on the DB result
         const completion2 = await groq.chat.completions.create({
           messages,
-          model: 'openai/gpt-oss-120b'
+          model: 'llama-3.1-70b-versatile'
         });
 
         return NextResponse.json({
