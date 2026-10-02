@@ -43,11 +43,7 @@ export async function GET(request: Request) {
 
     let fullTimetable: any[] = [];
     try {
-      const words = user.name.split(/[\s.]+/);
-      let searchStr = "";
-      for (const w of words) {
-        if (w.length > searchStr.length) searchStr = w;
-      }
+      const searchStr = user.name.trim();
       
       fullTimetable = await prisma.timetableEntry.findMany({
         where: {
