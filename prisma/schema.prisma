@@ -105,3 +105,18 @@ model TimetableEntry {
   
   // @@unique([classId, dayOrder, period])
 }
+
+model Attendance {
+  id          String   @id @default(uuid())
+  studentId   String   // VM No or Email
+  classId     String   // e.g., "IICSEA"
+  dateString  String   // e.g., "2026-10-02"
+  dayOrder    String
+  period      Int
+  subjectCode String
+  facultyName String
+  status      String   @default("PRESENT") // PRESENT, ABSENT, ON_DUTY
+  createdAt   DateTime @default(now())
+
+  @@unique([studentId, dateString, period])
+}

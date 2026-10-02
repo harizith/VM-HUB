@@ -52,15 +52,12 @@ export async function GET(request: Request) {
     const { currentDayOrder, tomorrowDayOrder } = await getDayOrderInfo();
 
     // 4. Fetch the timetable for the teacher (all classes they teach today)
-    // For simplicity, we try to match the user's name against the facultyName field
+    // We use a smart string match to find their classes even if they have "Mr." or "Dr." in the timetable.
+    // We use the exact name from the profile to match within the timetable string.
+    // If the user includes their initial (e.g. "Karthick V"), it won't match "Karthick P".
     let timetable: any[] = [];
     try {
-      const words = user.name.split(/[\s.]+/);
-      // We just use the longest part of the name to search, this bypasses issues like "Mr. P.Karthick" matching "Karthick/Prabhakaran"
-      let searchStr = "";
-      for (const w of words) {
-        if (w.length > searchStr.length) searchStr = w;
-      }
+      const searchStr = user.name.trim();
       
       timetable = await prisma.timetableEntry.findMany({
         where: {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { getDayOrderInfo } from "@/utils/dayOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -50,18 +51,22 @@ export async function GET(request: Request) {
 
     const searchStr = user?.name?.trim() || "";
 
-    // Find all unique classes this teacher teaches
+    const { currentDayOrder } = await getDayOrderInfo();
+    const todayString = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Fetch the teacher's full timetable (to know which students they can see)
     const teacherTimetable = await prisma.timetableEntry.findMany({
       where: {
         facultyName: {
           contains: searchStr,
           mode: "insensitive"
         }
-      },
-      select: {
-        classId: true
       }
     });
+
+    // Today's specific classes for the teacher
+    const todayClasses = teacherTimetable.filter(t => t.dayOrder === currentDayOrder);
+    todayClasses.sort((a, b) => a.period - b.period);
 
     const teacherClasses = new Set(teacherTimetable.map(t => t.classId));
 
@@ -79,15 +84,29 @@ export async function GET(request: Request) {
     });
 
     // Filter students to only include those in the teacher's classes
-    const students = allStudents.filter(student => {
-      // If the teacher has no timetable entries, maybe they shouldn't see anyone (or maybe everyone? let's stick to filtering)
-      const classId = computeStudentClassId(student.studentProfile);
-      return teacherClasses.has(classId);
+    const students = allStudents
+      .map(student => ({
+         ...student,
+         computedClassId: computeStudentClassId(student.studentProfile)
+      }))
+      .filter(student => teacherClasses.has(student.computedClassId));
+
+    // Fetch today's attendance records marked by this teacher
+    const attendance = await prisma.attendance.findMany({
+      where: {
+        dateString: todayString,
+        facultyName: searchStr
+      }
     });
 
     return NextResponse.json({
       success: true,
-      data: students
+      data: {
+        students,
+        todayClasses,
+        attendance,
+        dateString: todayString
+      }
     });
 
   } catch (error: any) {
