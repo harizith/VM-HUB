@@ -92,11 +92,16 @@ Instructions:
 7. Passwords are now stored using symmetric encryption (AES-256). To retrieve the plaintext password for a user, use execute_sql to get the encrypted password, and then use the 'decrypt_password' tool to decrypt it and show it to the user.`;
 
     if (attachedData) {
-      systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 5000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
+      systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 1000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
     }
 
-    // Limit history to the last 6 messages to avoid exceeding the 8000 token limit
-    const recentHistory = (history || []).slice(-6);
+    // Limit history to the last 4 messages and aggressively truncate them to avoid the 8000 token limit
+    const recentHistory = (history || []).slice(-4).map((msg: any) => {
+      if (typeof msg.content === 'string' && msg.content.length > 1500) {
+        return { ...msg, content: msg.content.substring(0, 1500) + '... [Truncated]' };
+      }
+      return msg;
+    });
 
     const messages: any[] = [
       {
@@ -243,12 +248,17 @@ Instructions:
         // Add the assistant's tool call request to the message history
         messages.push(responseMessage);
         
+        let resultString = typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult);
+        if (resultString.length > 2000) {
+          resultString = resultString.substring(0, 2000) + '... [Results Truncated. If you need more data, refine your query to LIMIT the output]';
+        }
+
         // Add the tool execution result to the message history
         messages.push({
           tool_call_id: toolCall.id,
           role: 'tool',
           name: toolName,
-          content: typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult)
+          content: resultString
         });
 
         // Let the AI generate the final response based on the DB result
