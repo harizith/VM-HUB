@@ -210,14 +210,14 @@ Instructions:
       }
     ];
 
-    const completion1 = await createCompletionWithFailover(messages, tools);
+    let currentCompletion = await createCompletionWithFailover(messages, tools);
+    let currentMessage = currentCompletion.choices[0]?.message;
 
-    const responseMessage = completion1.choices[0]?.message;
+    let iterations = 0;
+    const MAX_ITERATIONS = 4;
 
-    // Check if the model decided to call the database tool
-    if (responseMessage?.tool_calls?.length) {
-      const toolCall = responseMessage.tool_calls[0];
-      
+    while (currentMessage?.tool_calls?.length && iterations < MAX_ITERATIONS) {
+      const toolCall = currentMessage.tool_calls[0];
       let dbResult: any;
       let errorStr: string | null = null;
       let toolName = toolCall.function.name;
@@ -267,41 +267,35 @@ Instructions:
       } else if (toolName === 'decrypt_password') {
         const { encryptedString } = JSON.parse(toolCall.function.arguments);
         dbResult = decrypt(encryptedString);
+      } else {
+        dbResult = `Unknown tool: ${toolName}`;
       }
 
-      if (['execute_sql', 'create_user', 'update_user_password', 'decrypt_password'].includes(toolName)) {
-
-        // Add the assistant's tool call request to the message history
-        messages.push(responseMessage);
-        
-        let resultString = typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult);
-        if (resultString.length > 2000) {
-          resultString = resultString.substring(0, 2000) + '... [Results Truncated. If you need more data, refine your query to LIMIT the output]';
-        }
-
-        // Add the tool execution result to the message history
-        messages.push({
-          tool_call_id: toolCall.id,
-          role: 'tool',
-          name: toolName,
-          content: resultString
-        });
-
-        // Let the AI generate the final response based on the DB result
-        const completion2 = await createCompletionWithFailover(messages);
-
-        return NextResponse.json({
-          success: !errorStr,
-          reply: completion2.choices[0]?.message?.content || "I couldn't generate a final response.",
-          data: { dbResult }
-        });
+      // Add the assistant's tool call request to the message history
+      messages.push(currentMessage);
+      
+      let resultString = typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult);
+      if (resultString.length > 2000) {
+        resultString = resultString.substring(0, 2000) + '... [Results Truncated. If you need more data, refine your query to LIMIT the output]';
       }
+
+      // Add the tool execution result to the message history
+      messages.push({
+        tool_call_id: toolCall.id,
+        role: 'tool',
+        name: toolName,
+        content: resultString
+      });
+
+      // Fetch the next response from the AI
+      currentCompletion = await createCompletionWithFailover(messages, tools);
+      currentMessage = currentCompletion.choices[0]?.message;
+      iterations++;
     }
 
-    // If no tool was called, return the AI's direct response
     return NextResponse.json({
       success: true,
-      reply: responseMessage?.content || "I couldn't generate a response."
+      reply: currentMessage?.content || "I couldn't generate a final response."
     });
 
   } catch (error: any) {
