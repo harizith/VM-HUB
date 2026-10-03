@@ -92,15 +92,18 @@ Instructions:
 7. Passwords are now stored using symmetric encryption (AES-256). To retrieve the plaintext password for a user, use execute_sql to get the encrypted password, and then use the 'decrypt_password' tool to decrypt it and show it to the user.`;
 
     if (attachedData) {
-      systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 50000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
+      systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 5000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
     }
+
+    // Limit history to the last 6 messages to avoid exceeding the 8000 token limit
+    const recentHistory = (history || []).slice(-6);
 
     const messages: any[] = [
       {
         role: 'system',
         content: systemContent
       },
-      ...(history || []),
+      ...recentHistory,
       {
         role: 'user',
         content: query
