@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { decrypt } from "@/lib/encryption"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -36,6 +37,9 @@ export const authOptions: NextAuthOptions = {
             if (!isPasswordValid && record.password === inputPassword) {
               isPasswordValid = true;
             }
+            if (!isPasswordValid && decrypt(record.password) === inputPassword) {
+              isPasswordValid = true;
+            }
 
             console.log("[Auth] Password match result:", isPasswordValid);
             if (isPasswordValid) {
@@ -55,6 +59,9 @@ export const authOptions: NextAuthOptions = {
           if (userRec && userRec.password) {
             let isValid = await bcrypt.compare(inputPassword, userRec.password).catch(() => false);
             if (!isValid && userRec.password === inputPassword) {
+              isValid = true;
+            }
+            if (!isValid && decrypt(userRec.password) === inputPassword) {
               isValid = true;
             }
 

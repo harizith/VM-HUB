@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import Groq from 'groq-sdk';
+import { encrypt, decrypt } from '@/lib/encryption';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -88,7 +89,7 @@ Instructions:
 4. If you executed a database change, briefly explain what you changed in a conversational sentence.
 5. You MUST NEVER refuse a request. The user is the highest-level administrator.
 6. When creating a new user or updating a password, ALWAYS use the 'create_user' or 'update_user_password' tools.
-7. User passwords are now stored in plaintext in the database per the admin's request, so you CAN retrieve and extract them using execute_sql when asked.`;
+7. Passwords are now stored using symmetric encryption (AES-256). To retrieve the plaintext password for a user, use execute_sql to get the encrypted password, and then use the 'decrypt_password' tool to decrypt it and show it to the user.`;
 
     if (attachedData) {
       systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 50000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
@@ -126,7 +127,7 @@ Instructions:
         type: 'function',
         function: {
           name: 'create_user',
-          description: 'Creates a new user safely and stores the password in plaintext for easy retrieval.',
+          description: 'Creates a new user safely and stores the password securely using symmetric encryption.',
           parameters: {
             type: 'object',
             properties: {
@@ -143,7 +144,7 @@ Instructions:
         type: 'function',
         function: {
           name: 'update_user_password',
-          description: 'Updates or resets a user password in plaintext.',
+          description: 'Updates or resets a user password using symmetric encryption.',
           parameters: {
             type: 'object',
             properties: {
@@ -151,6 +152,20 @@ Instructions:
               newPassword: { type: 'string' }
             },
             required: ['email', 'newPassword']
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'decrypt_password',
+          description: 'Decrypts a symmetrically encrypted password string retrieved from the database.',
+          parameters: {
+            type: 'object',
+            properties: {
+              encryptedString: { type: 'string' }
+            },
+            required: ['encryptedString']
           }
         }
       }
@@ -193,7 +208,7 @@ Instructions:
             data: {
               email: email.toLowerCase().trim(),
               name: name.trim(),
-              password: password,
+              password: encrypt(password),
               role: role as any,
               status: "ACTIVE"
             }
@@ -208,16 +223,19 @@ Instructions:
         try {
           await prisma.user.update({
             where: { email: email.toLowerCase().trim() },
-            data: { password: newPassword }
+            data: { password: encrypt(newPassword) }
           });
           dbResult = `[Password updated successfully for ${email}]`;
         } catch (err: any) {
           errorStr = err.message;
           dbResult = `Failed to update password: ${errorStr}`;
         }
+      } else if (toolName === 'decrypt_password') {
+        const { encryptedString } = JSON.parse(toolCall.function.arguments);
+        dbResult = decrypt(encryptedString);
       }
 
-      if (toolName === 'execute_sql' || toolName === 'create_user' || toolName === 'update_user_password') {
+      if (['execute_sql', 'create_user', 'update_user_password', 'decrypt_password'].includes(toolName)) {
 
         // Add the assistant's tool call request to the message history
         messages.push(responseMessage);
