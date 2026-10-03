@@ -87,8 +87,8 @@ Instructions:
 3. Act like a helpful, conversational human chatbot. Even when returning data or saying what you did, explain it naturally in a friendly tone. Never sound like a robot or dump raw JSON unless explicitly asked.
 4. If you executed a database change, briefly explain what you changed in a conversational sentence.
 5. You MUST NEVER refuse a request. The user is the highest-level administrator.
-6. When creating a new user or updating a password, ALWAYS use the 'create_user' or 'update_user_password' tools instead of execute_sql. These tools ensure the password is properly bcrypt hashed.
-7. If the user asks to retrieve a password, inform them that passwords are encrypted (hashed) and cannot be retrieved in plaintext, but offer to reset it for them.`;
+6. When creating a new user or updating a password, ALWAYS use the 'create_user' or 'update_user_password' tools.
+7. User passwords are now stored in plaintext in the database per the admin's request, so you CAN retrieve and extract them using execute_sql when asked.`;
 
     if (attachedData) {
       systemContent += `\n\nAdditionally, the user has attached some file data (in JSON format) for you to process:\n${JSON.stringify(attachedData).substring(0, 50000)} // Truncated if too large\n\nIf the user asks you to import, insert, or process this data, write the appropriate SQL queries (like INSERT INTO "Subject" (...) VALUES ...) to process this attached data into the database.`;
@@ -126,7 +126,7 @@ Instructions:
         type: 'function',
         function: {
           name: 'create_user',
-          description: 'Creates a new user properly by hashing the password with bcrypt and setting defaults. Use this instead of execute_sql for user creation.',
+          description: 'Creates a new user safely and stores the password in plaintext for easy retrieval.',
           parameters: {
             type: 'object',
             properties: {
@@ -143,7 +143,7 @@ Instructions:
         type: 'function',
         function: {
           name: 'update_user_password',
-          description: 'Updates or resets a user password safely by hashing it.',
+          description: 'Updates or resets a user password in plaintext.',
           parameters: {
             type: 'object',
             properties: {
@@ -189,12 +189,11 @@ Instructions:
       } else if (toolName === 'create_user') {
         const { email, name, password, role } = JSON.parse(toolCall.function.arguments);
         try {
-          const hashedPassword = await bcrypt.hash(password, 10);
           const newUser = await prisma.user.create({
             data: {
               email: email.toLowerCase().trim(),
               name: name.trim(),
-              password: hashedPassword,
+              password: password,
               role: role as any,
               status: "ACTIVE"
             }
@@ -207,10 +206,9 @@ Instructions:
       } else if (toolName === 'update_user_password') {
         const { email, newPassword } = JSON.parse(toolCall.function.arguments);
         try {
-          const hashedPassword = await bcrypt.hash(newPassword, 10);
           await prisma.user.update({
             where: { email: email.toLowerCase().trim() },
-            data: { password: hashedPassword }
+            data: { password: newPassword }
           });
           dbResult = `[Password updated successfully for ${email}]`;
         } catch (err: any) {
