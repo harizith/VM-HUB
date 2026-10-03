@@ -51,7 +51,8 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = name.trim();
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Use plaintext directly to allow AI and Admin to retrieve passwords (Option C)
+    const storedPassword = password;
     const validRole = ["STUDENT", "FACULTY", "HOD", "ADMIN"].includes(role) ? role : "STUDENT";
 
     // 1. Check if user already exists
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
         ${newId},
         ${cleanEmail},
         ${cleanName},
-        ${hashedPassword},
+        ${storedPassword},
         ${validRole}::"Role",
         'ACTIVE',
         NOW(),
