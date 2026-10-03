@@ -98,9 +98,8 @@ export async function getDayOrderInfo() {
   
   let tomorrowDayOrder = "Leave";
   if (isWorkingDay(tomorrow)) {
-    // If today is a working day, tomorrow's index is doIndex + 1
-    // If today is a leave, tomorrow's index is the same as the "pending" index
-    const tomorrowIndex = (((baseIndex + weekdays + (isWorkingDay(today) ? 1 : 0)) % 5) + 5) % 5;
+    // Tomorrow is a working day, so its index is the total working days up to today + 1
+    const tomorrowIndex = (((baseIndex + weekdays + 1) % 5) + 5) % 5;
     tomorrowDayOrder = roman[tomorrowIndex];
   }
 
