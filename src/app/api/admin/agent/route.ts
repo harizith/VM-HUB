@@ -4,7 +4,38 @@ import bcrypt from 'bcryptjs';
 import Groq from 'groq-sdk';
 import { encrypt, decrypt } from '@/lib/encryption';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const apiKeys = [
+  process.env.GROQ_API_KEY,
+  process.env.FALLBACK_GROQ_API_KEY,
+  process.env.FALLBACK_GROQ_API_KEY_2
+].filter(Boolean) as string[];
+
+async function createCompletionWithFailover(messages: any[], tools?: any[]) {
+  let lastError: any;
+  for (const apiKey of apiKeys) {
+    try {
+      const groqClient = new Groq({ apiKey });
+      const options: any = {
+        messages,
+        model: 'openai/gpt-oss-120b',
+      };
+      if (tools) {
+        options.tools = tools;
+        options.tool_choice = 'auto';
+      }
+      return await groqClient.chat.completions.create(options);
+    } catch (error: any) {
+      const errStr = error?.message || String(error);
+      if (errStr.includes('rate_limit') || errStr.includes('tokens per minute') || error?.status === 429 || error?.status === 413) {
+        lastError = error;
+        console.warn(`Groq API Key ending in ${apiKey.slice(-4)} failed due to rate limits. Trying next...`);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError || new Error("All Groq API keys hit rate limits or none were provided. Please add FALLBACK_GROQ_API_KEY to your .env");
+}
 
 const schemaStr = `
 model User {
@@ -179,12 +210,7 @@ Instructions:
       }
     ];
 
-    const completion1 = await groq.chat.completions.create({
-      messages,
-      model: 'openai/gpt-oss-120b',
-      tools,
-      tool_choice: 'auto'
-    });
+    const completion1 = await createCompletionWithFailover(messages, tools);
 
     const responseMessage = completion1.choices[0]?.message;
 
@@ -262,10 +288,7 @@ Instructions:
         });
 
         // Let the AI generate the final response based on the DB result
-        const completion2 = await groq.chat.completions.create({
-          messages,
-          model: 'openai/gpt-oss-120b'
-        });
+        const completion2 = await createCompletionWithFailover(messages);
 
         return NextResponse.json({
           success: !errorStr,
