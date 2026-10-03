@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { encrypt } from "@/lib/encryption";
 
 // GET /api/admin/users - Fetch all users with their profile relations from DB
 export async function GET() {
@@ -51,8 +51,8 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = name.trim();
-    // Use plaintext directly to allow AI and Admin to retrieve passwords (Option C)
-    const storedPassword = password;
+    // Encrypt the password symmetrically so it's protected in DB but reversible
+    const storedPassword = encrypt(password);
     const validRole = ["STUDENT", "FACULTY", "HOD", "ADMIN"].includes(role) ? role : "STUDENT";
 
     // 1. Check if user already exists
