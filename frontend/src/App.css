@@ -1,0 +1,322 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* BASIC 50/50 SPLIT */
+.split-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* LEFT SIDE - ROYAL BLUE */
+.login-left {
+  flex: 1;
+  background: linear-gradient(135deg, #092056 0%, #1a4fc2 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  padding: 3rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Creative Animated Blobs */
+.login-left::before {
+  content: '';
+  position: absolute;
+  top: -10%; left: -10%;
+  width: 450px; height: 450px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 8s ease-in-out infinite;
+  z-index: 0;
+}
+
+.login-left::after {
+  content: '';
+  position: absolute;
+  bottom: -15%; right: -15%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(191, 219, 254, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 12s ease-in-out infinite reverse;
+  z-index: 0;
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.left-top-text {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  z-index: 10;
+  margin-bottom: 3rem;
+  text-align: center;
+  
+  /* Attractive Gold/Amber Gradient */
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 15px rgba(245, 158, 11, 0.4));
+}
+
+/* SLEEK SMARTWATCH RING CLOCK */
+.clock-widget {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4rem;
+  z-index: 10;
+}
+
+.clock-ring {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.08); /* Faint background track */
+  box-shadow: 
+    inset 0 0 20px rgba(0,0,0,0.1), 
+    0 0 30px rgba(96, 165, 250, 0.2);
+}
+
+.clock-ring::before {
+  content: '';
+  position: absolute;
+  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: #60a5fa; /* Bright blue spinning edge */
+  border-right-color: #3b82f6;
+  animation: spin 8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.clock-content {
+  text-align: center;
+  z-index: 10;
+}
+
+.clock-time {
+  font-size: 4.5rem;
+  font-weight: 800;
+  letter-spacing: -2px;
+  color: #ffffff;
+  line-height: 1;
+  text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.clock-date {
+  font-size: 1rem;
+  color: #bfdbfe;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+.left-bottom-text {
+  text-align: center;
+  color: #dbeafe;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  font-weight: 300;
+  max-width: 400px;
+  z-index: 10;
+  position: relative;
+}
+
+/* RIGHT SIDE - WHITE FORM */
+.login-right {
+  flex: 1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-form-container h1 {
+  color: #0f172a;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #64748b;
+  font-size: 1rem;
+  margin-bottom: 3rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.form-input {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1a4fc2;
+  box-shadow: 0 0 0 3px rgba(26, 79, 194, 0.15);
+  background: #ffffff;
+}
+
+.form-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.submit-btn {
+  width: 100%;
+  background: #1a4fc2;
+  color: white;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.submit-btn:hover {
+  background: #1541a3;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .split-layout {
+    flex-direction: column;
+  }
+  .login-left, .login-right {
+    flex: none;
+    height: 50vh;
+  }
+}
+
+/* MODE TABS (Segmented Control) */
+.mode-tabs {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 2rem;
+  gap: 4px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mode-tab:hover {
+  color: #0f172a;
+}
+
+.mode-tab.active {
+  background: #ffffff;
+  color: #1a4fc2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* MODE PAGE VIEW (Just the mode name, no extras) */
+.mode-page-view {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #092056 0%, #1a4fc2 100%);
+  color: #ffffff;
+  position: relative;
+}
+
+.mode-heading {
+  font-size: 5rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+  text-align: center;
+  color: #ffffff;
+  text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.mode-back-btn {
+  position: absolute;
+  top: 2.5rem;
+  left: 2.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #bfdbfe;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.mode-back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
