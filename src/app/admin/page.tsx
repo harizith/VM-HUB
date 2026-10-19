@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid } from "lucide-react";
+import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle } from "lucide-react";
 import AdminAgentChat from "@/components/AdminAgentChat";
 import AdminTimetablePdfUpload from "@/components/AdminTimetablePdfUpload";
 import AdminTimetableExcelUpload from "@/components/AdminTimetableExcelUpload";
@@ -86,6 +86,7 @@ export default function AdminPage() {
 
   // Timetable State
   const [timetableMode, setTimetableMode] = useState<"faculty" | "class">("faculty");
+  const [timetableUploadTab, setTimetableUploadTab] = useState<"doc-excel" | "pdf">("doc-excel");
   const [timetableCalendarView, setTimetableCalendarView] = useState(false);
   const [selectedDept, setSelectedDept] = useState("CSE");
   const [selectedYear, setSelectedYear] = useState("II");
@@ -95,6 +96,7 @@ export default function AdminPage() {
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [isEditingTimetable, setIsEditingTimetable] = useState(false);
   const [loadingTimetable, setLoadingTimetable] = useState(false);
+  const [randomizingTimetable, setRandomizingTimetable] = useState(false);
 
   // Day Order Override State
   const [currentDayOrderIndex, setCurrentDayOrderIndex] = useState("0");
@@ -573,7 +575,7 @@ export default function AdminPage() {
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
-              { id: "upload-timetable", label: "Upload Timetable PDF", Icon: FileText, count: 0 },
+              { id: "upload-timetable", label: "Timetable Import & Templates", Icon: FileText, count: 0 },
               { id: "upload-users", label: "Bulk User Onboarding", Icon: UserPlus, count: 0 },
               { id: "automation", label: "Automation Engine", Icon: Zap, count: 0 },
               { id: "audit", label: "Audit Trail", Icon: Shield, count: auditLogs.length },
@@ -670,7 +672,7 @@ export default function AdminPage() {
                   {activeTab === "subjects" && "Course & Subject Catalog"}
                   {activeTab === "notices" && "System Announcements & Broadcasts"}
                   {activeTab === "timetable" && "Class Timetable Management"}
-                  {activeTab === "upload-timetable" && "Excel Timetable Import"}
+                  {activeTab === "upload-timetable" && "Timetable Import & Official Templates"}
                   {activeTab === "upload-users" && "Bulk User Creation & Profile Setup"}
                   {activeTab === "automation" && "Autonomous Operations & Intelligence Engine"}
                   {activeTab === "audit" && "System Audit Trail & Security Logs"}
@@ -1136,6 +1138,54 @@ export default function AdminPage() {
                         Fetch Timetable
                       </button>
 
+                      <button
+                        onClick={async () => {
+                          const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
+                          if (!confirm(`Fill missing periods for class ${classId} with randomized subjects from this class's curriculum? Existing scheduled periods will remain untouched.`)) return;
+                          setRandomizingTimetable(true);
+                          setIsEditingTimetable(false);
+                          try {
+                            const res = await fetch("/api/admin/timetable/randomize", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ classId })
+                            }).then(r => r.json());
+                            if (res.success) {
+                              setTimetable(res.timetable);
+                              alert(res.message || `Missing periods filled successfully for ${classId}!`);
+                            } else {
+                              alert("Randomize failed: " + res.error);
+                            }
+                          } catch (e: any) {
+                            alert("Randomize error: " + e.message);
+                          } finally {
+                            setRandomizingTimetable(false);
+                          }
+                        }}
+                        disabled={randomizingTimetable}
+                        title="Randomly fills empty periods in this class timetable while leaving existing periods unchanged"
+                        style={{
+                          minWidth: "175px",
+                          alignSelf: "flex-end",
+                          height: "42px",
+                          backgroundColor: "rgba(168, 85, 247, 0.15)",
+                          color: "#c084fc",
+                          border: "1px solid rgba(168, 85, 247, 0.35)",
+                          padding: "0.6rem 1rem",
+                          borderRadius: "8px",
+                          fontWeight: "600",
+                          fontSize: "0.85rem",
+                          cursor: randomizingTimetable ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "0.4rem",
+                          opacity: randomizingTimetable ? 0.7 : 1
+                        }}
+                      >
+                        <Shuffle size={16} /> {randomizingTimetable ? "Filling Missing..." : "Randomize Missing Periods"}
+                      </button>
+
                       <button onClick={async () => {
                         const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
                         if (!confirm(`Are you sure you want to permanently delete the entire timetable for class ${classId}?`)) return;
@@ -1211,7 +1261,7 @@ export default function AdminPage() {
                                         if (entryIdx !== -1) newTt[entryIdx].facultyName = e.target.value;
                                         setTimetable(newTt);
                                       }} style={{ width: "100%", padding: "0.25rem", fontSize: "0.8rem", borderRadius: "4px", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-input)", color: "var(--text-main)" }} />
-                                      <input type="text" placeholder="Faculty VM No (e.g. 1947, 2017, 2002)" value={primaryEntry?.vmsNo || ""} onChange={(e) => {
+                                      <input type="text" placeholder="Faculty MTS No (e.g. 1947, 2017, 2002)" value={primaryEntry?.vmsNo || ""} onChange={(e) => {
                                         const newTt = [...timetable];
                                         const entryIdx = newTt.findIndex(t => t.dayOrder === day && t.period === period);
                                         if (entryIdx !== -1) newTt[entryIdx].vmsNo = e.target.value;
@@ -1379,16 +1429,123 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* PDF TIMETABLE UPLOAD */}
+            {/* TIMETABLE UPLOAD (WORD / EXCEL / PDF) */}
             {activeTab === "upload-timetable" && (
-              <AdminTimetablePdfUpload
-                onUploadSuccess={() => {
-                  fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
-                    if (res.success) setAuditLogs(res.logs);
-                  });
-                  fetchData();
-                }}
-              />
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {/* Upload Format Toggle Header */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: "var(--bg-card)",
+                  padding: "0.75rem 1rem",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border-subtle)",
+                  flexWrap: "wrap",
+                  gap: "0.75rem"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "var(--text-main)" }}>
+                      Upload Type:
+                    </span>
+                    <div style={{ display: "flex", backgroundColor: "var(--bg-input)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
+                      <button
+                        onClick={() => setTimetableUploadTab("doc-excel")}
+                        style={{
+                          padding: "0.4rem 0.9rem",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          fontWeight: "700",
+                          border: "none",
+                          cursor: "pointer",
+                          backgroundColor: timetableUploadTab === "doc-excel" ? "var(--royal-blue)" : "transparent",
+                          color: timetableUploadTab === "doc-excel" ? "#fff" : "var(--text-muted)",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        📄 Word (.docx/.doc) & Excel (.xlsx)
+                      </button>
+                      <button
+                        onClick={() => setTimetableUploadTab("pdf")}
+                        style={{
+                          padding: "0.4rem 0.9rem",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          fontWeight: "700",
+                          border: "none",
+                          cursor: "pointer",
+                          backgroundColor: timetableUploadTab === "pdf" ? "var(--royal-blue)" : "transparent",
+                          color: timetableUploadTab === "pdf" ? "#fff" : "var(--text-muted)",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        📑 PDF Document (.pdf)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <a
+                      href="/api/admin/timetable/template-doc"
+                      download="timetable-import-template.docx"
+                      style={{
+                        fontSize: "0.8rem",
+                        padding: "0.35rem 0.75rem",
+                        borderRadius: "6px",
+                        backgroundColor: "var(--bg-input)",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-main)",
+                        textDecoration: "none",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem"
+                      }}
+                    >
+                      ⬇ Word Template (.docx)
+                    </a>
+                    <a
+                      href="/api/admin/timetable/template-pdf?type=individual"
+                      download="individual-faculty-timetable-template.pdf"
+                      style={{
+                        fontSize: "0.8rem",
+                        padding: "0.35rem 0.75rem",
+                        borderRadius: "6px",
+                        backgroundColor: "var(--bg-input)",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-main)",
+                        textDecoration: "none",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem"
+                      }}
+                    >
+                      ⬇ PDF Template (.pdf)
+                    </a>
+                  </div>
+                </div>
+
+                {timetableUploadTab === "doc-excel" ? (
+                  <AdminTimetableExcelUpload
+                    onUploadSuccess={() => {
+                      fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
+                        if (res.success) setAuditLogs(res.logs);
+                      });
+                      fetchData();
+                    }}
+                  />
+                ) : (
+                  <AdminTimetablePdfUpload
+                    onUploadSuccess={() => {
+                      fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
+                        if (res.success) setAuditLogs(res.logs);
+                      });
+                      fetchData();
+                    }}
+                  />
+                )}
+              </div>
             )}
 
             {/* BULK USER & PROFILE ONBOARDING */}
@@ -1624,7 +1781,7 @@ export default function AdminPage() {
               {newUserRole !== "ADMIN" && (
                 <input 
                   type="text" 
-                  placeholder={newUserRole === "STUDENT" ? "VM No (e.g. 17433)" : "VMS No (e.g. EMP-CSE-001)"} 
+                  placeholder={newUserRole === "STUDENT" ? "VM No (e.g. 17433)" : "MTS No (e.g. 1944 or MTS-CSE-001)"} 
                   value={newUserVmNo} 
                   onChange={(e) => setNewUserVmNo(e.target.value)} 
                   required 

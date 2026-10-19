@@ -634,7 +634,7 @@ export default function OverallTimetable({
                     <strong>{mode === "student" ? "Student Name:" : "Name of Faculty:"}</strong> {resolvedName}
                   </div>
                   <div>
-                    <strong>{mode === "student" ? "Roll / VM No:" : "MTS / VMS No:"}</strong> {resolvedId}
+                    <strong>{mode === "student" ? "Roll / VM No:" : "MTS No:"}</strong> {resolvedId}
                   </div>
                   <div>
                     <strong>{mode === "student" ? "Class & Section:" : "Designation:"}</strong> {mode === "student" ? resolvedClassId : resolvedDesignation}

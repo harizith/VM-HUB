@@ -210,7 +210,7 @@ export default function TeacherProfilePage() {
             
             <div style={{ marginTop: "2rem", width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "1rem", backgroundColor: "var(--bg-card-header)", borderRadius: "8px" }}>
-                <span style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem" }}><FiHash /> VM Number</span>
+                <span style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem" }}><FiHash /> MTS Number</span>
                 <strong style={{ color: "var(--text-main)" }}>{data.vmNo}</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "1rem", backgroundColor: "var(--bg-card-header)", borderRadius: "8px" }}>
@@ -240,11 +240,24 @@ export default function TeacherProfilePage() {
             </div>
 
             <div className="student-card premium-card">
-              <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FiBook /> Teaching Assignments
-              </h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <h3 style={{ margin: 0, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <FiBook /> Teaching Assignments
+                </h3>
+                <span style={{ 
+                  fontSize: "0.75rem", 
+                  fontWeight: 600, 
+                  padding: "0.25rem 0.6rem", 
+                  borderRadius: "9999px", 
+                  backgroundColor: "rgba(99, 102, 241, 0.12)", 
+                  color: "var(--royal-blue)",
+                  border: "1px solid rgba(99, 102, 241, 0.25)"
+                }}>
+                  Admin Managed • Read Only
+                </span>
+              </div>
               <p style={{ margin: "0 0 1.25rem 0", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                These assignments are maintained by your administrator.
+                These columns are only visible in teacher mode and are maintained strictly by the administrator. Teachers cannot edit these assignments.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 {[

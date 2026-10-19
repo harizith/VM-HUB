@@ -124,7 +124,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
         {
           "Full Name": "Dr. E. Mercy Beulah",
           "Email Address": "mercybeulah@veltech.edu.in",
-          "VMS No": "2103",
+          "MTS No": "2103",
           "Department": "CSE",
           "Designation": "Assistant Professor",
           "Subject1": "Data Structures",
@@ -137,7 +137,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
         {
           "Full Name": "Mr. P. Sathish Kumar",
           "Email Address": "sathishkumar@veltech.edu.in",
-          "VMS No": "2088",
+          "MTS No": "2088",
           "Department": "CSE",
           "Designation": "Assistant Professor",
           "Subject1": "",
@@ -151,7 +151,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
       columnsGuide: [
         { col: "Full Name", req: "Required", sample: "Dr. E. Mercy Beulah", desc: "User.name" },
         { col: "Email Address", req: "Required", sample: "mercy@veltech.edu.in", desc: "User.email (Primary Login Key)" },
-        { col: "VMS No / VM No", req: "Required for teacher assignments", sample: "2103", desc: "User.vmNo & FacultyProfile.vmNo" },
+        { col: "MTS No", req: "Required for teacher assignments", sample: "2103", desc: "User.vmNo & FacultyProfile.vmNo" },
         { col: "Department", req: "Optional", sample: "CSE, ECE, AIDS, MECH", desc: "FacultyProfile.department" },
         { col: "Designation", req: "Optional", sample: "Assistant Professor, Professor", desc: "FacultyProfile.designation" },
         { col: "Subject1", req: "Optional", sample: "Data Structures", desc: "FacultyProfile.subject1 (read-only for faculty)" },
@@ -173,7 +173,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
         {
           "Full Name": "Dr. R. Saravanan",
           "Email Address": "saravanan.r@veltech.edu.in",
-          "MTS / VMS No": "1944",
+          "MTS No": "1944",
           "Department": "CSE",
           "Designation": "Professor & Head",
           "Password": "Welcome@123"
@@ -182,7 +182,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
       columnsGuide: [
         { col: "Full Name", req: "Required", sample: "Dr. R. Saravanan", desc: "User.name" },
         { col: "Email Address", req: "Required", sample: "saravanan@veltech.edu.in", desc: "User.email (Primary Login Key)" },
-        { col: "MTS / VMS No", req: "Required", sample: "1944", desc: "User.vmNo & HodProfile.vmNo" },
+        { col: "MTS No", req: "Required", sample: "1944", desc: "User.vmNo & HodProfile.vmNo" },
         { col: "Department", req: "Optional", sample: "CSE", desc: "HodProfile.department jurisdiction" },
         { col: "Designation", req: "Optional", sample: "Professor & Head", desc: "HodProfile.designation" },
         { col: "Password", req: "Optional", sample: "Welcome@123", desc: "Encrypted password (default Welcome@123)" }
@@ -531,7 +531,7 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
                     </strong>
                     <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                       {modeKey === "STUDENT" && "Roll No, Sem, Sec, Dept"}
-                      {modeKey === "FACULTY" && "VMS No, Designation, Dept"}
+                      {modeKey === "FACULTY" && "MTS No, Designation, Dept"}
                       {modeKey === "HOD" && "MTS No, Dept, Head Role"}
                       {modeKey === "ALL" && "All combined with Role col"}
                     </span>

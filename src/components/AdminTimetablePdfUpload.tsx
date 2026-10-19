@@ -18,7 +18,8 @@ import {
   Info,
   Check,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download
 } from "lucide-react";
 
 interface FacultyExtractedSummary {
@@ -161,24 +162,70 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
             </p>
           </div>
 
-          <button
-            onClick={() => setShowGuide(!showGuide)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.5rem 0.9rem",
-              borderRadius: "8px",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-input)",
-              color: "var(--text-muted)",
-              fontSize: "0.8rem",
-              fontWeight: "600",
-              cursor: "pointer"
-            }}
-          >
-            <Info size={14} /> {showGuide ? "Hide PDF Guide" : "View PDF Guide"}
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <a
+              href="/api/admin/timetable/template-pdf?type=individual"
+              download="individual-faculty-timetable-template.pdf"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                textDecoration: "none",
+                cursor: "pointer"
+              }}
+            >
+              <Download size={14} color="var(--sky-blue)" /> Faculty PDF Template
+            </a>
+            <a
+              href="/api/admin/timetable/template-pdf?type=class"
+              download="master-class-timetable-template.pdf"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                textDecoration: "none",
+                cursor: "pointer"
+              }}
+            >
+              <Download size={14} color="var(--royal-blue)" /> Class PDF Template
+            </a>
+            <button
+              onClick={() => setShowGuide(!showGuide)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--text-muted)",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                cursor: "pointer"
+              }}
+            >
+              <Info size={14} /> {showGuide ? "Hide PDF Guide" : "View PDF Guide"}
+            </button>
+          </div>
         </div>
 
         {/* Algorithm & Format Guide */}

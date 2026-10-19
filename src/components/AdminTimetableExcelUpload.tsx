@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { 
   UploadCloud, 
   FileSpreadsheet, 
+  FileText,
   Download, 
   CheckCircle2, 
   AlertCircle, 
@@ -13,7 +14,7 @@ import {
   Trash2,
   Calendar,
   Layers,
-  ArrowRight
+  Sparkles
 } from "lucide-react";
 
 interface TimetablePreviewRow {
@@ -31,6 +32,7 @@ interface TimetablePreviewRow {
 
 export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
   const [file, setFile] = useState<File | null>(null);
+  const [fileType, setFileType] = useState<"excel" | "doc" | null>(null);
   const [parsedRows, setParsedRows] = useState<TimetablePreviewRow[]>([]);
   const [parsingError, setParsingError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +51,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Subject Name": "Digital Principles & System Design",
       "Subject Category": "sub1",
       "Faculty Name": "Dr. R. Saravanan",
-      "VMS No": "1944",
+      "MTS No": "1944",
       "Room No": "LH-201",
       "Time Range": "08:05 - 08:55"
     },
@@ -61,7 +63,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Subject Name": "Foundations of Data Science",
       "Subject Category": "sub2",
       "Faculty Name": "Ms. V. Vijayashanthi",
-      "VMS No": "17433",
+      "MTS No": "17433",
       "Room No": "LH-201",
       "Time Range": "08:55 - 09:45"
     },
@@ -73,7 +75,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Subject Name": "Object Oriented Programming",
       "Subject Category": "lab1",
       "Faculty Name": "Mr. N. Insozhan",
-      "VMS No": "1069",
+      "MTS No": "1069",
       "Room No": "LH-201",
       "Time Range": "10:00 - 10:50"
     },
@@ -85,13 +87,17 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Subject Name": "Cloud Computing & DevOps",
       "Subject Category": "pe",
       "Faculty Name": "Dr. E. Mercy Beulah",
-      "VMS No": "2103",
+      "MTS No": "2103",
       "Room No": "N-203",
       "Time Range": "08:05 - 08:55"
     }
   ];
 
-  const handleDownloadTemplate = (format: "xlsx" | "csv") => {
+  const handleDownloadTemplate = (format: "xlsx" | "csv" | "docx") => {
+    if (format === "docx") {
+      window.open("/api/admin/timetable/template-doc", "_blank");
+      return;
+    }
     const ws = XLSX.utils.json_to_sheet(SAMPLE_ROWS);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Timetable_Template");
@@ -116,11 +122,39 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
     }
   };
 
-  const processFile = (f: File) => {
+  const processFile = async (f: File) => {
     setFile(f);
     setParsingError(null);
     setUploadResult(null);
 
+    const name = f.name.toLowerCase();
+    const isDoc = name.endsWith(".docx") || name.endsWith(".doc");
+
+    if (isDoc) {
+      setFileType("doc");
+      // Use backend parser endpoint for doc/docx files
+      try {
+        const formData = new FormData();
+        formData.append("file", f);
+        const res = await fetch("/api/admin/timetable/parse-doc", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.rows) && data.rows.length > 0) {
+          setParsedRows(data.rows);
+        } else {
+          setParsingError(data.error || "Could not parse timetable tables from Word document.");
+          setParsedRows([]);
+        }
+      } catch (err: any) {
+        setParsingError(err.message || "Failed to parse Word document.");
+        setParsedRows([]);
+      }
+      return;
+    }
+
+    setFileType("excel");
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -216,6 +250,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
 
   const handleClear = () => {
     setFile(null);
+    setFileType(null);
     setParsedRows([]);
     setParsingError(null);
     setUploadResult(null);
@@ -233,18 +268,36 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
               <span style={{ backgroundColor: "rgba(56, 189, 248, 0.15)", color: "var(--sky-blue)", padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.75rem", fontWeight: "700" }}>
-                EXCEL TIMETABLE IMPORT
+                DOCUMENT & SPREADSHEET TIMETABLE IMPORT
               </span>
             </div>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "800", margin: 0, color: "var(--text-main)" }}>
-              Upload Individual & Class Timetables (.xlsx / .csv)
+              Upload Timetables (.docx, .doc, .xlsx, .csv)
             </h2>
             <p style={{ margin: "0.4rem 0 0 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
-              Upload complete or partial schedules. Blank cells stay blank; only non-empty rows are imported.
+              Upload official Word documents or Excel spreadsheets. Blank cells stay blank; only non-empty rows are imported.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              onClick={() => handleDownloadTemplate("docx")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.55rem 1rem",
+                borderRadius: "8px",
+                backgroundColor: "var(--bg-input)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                cursor: "pointer"
+              }}
+            >
+              <Download size={15} color="#2563eb" /> Download .docx Template
+            </button>
             <button
               onClick={() => handleDownloadTemplate("xlsx")}
               style={{
@@ -294,7 +347,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Info size={18} color="var(--sky-blue)" />
             <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0, color: "var(--text-main)" }}>
-              File Format & Column Arrangement Guide
+              Standard Timetable Document / Spreadsheet Format Specification
             </h3>
           </div>
           <span style={{ fontSize: "0.85rem", color: "var(--sky-blue)", fontWeight: "600" }}>
@@ -305,7 +358,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
         {showFormatGuide && (
           <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              The first row should contain these column names (case-insensitive). All timetable values may be left blank; empty spreadsheet rows are ignored.
+              The document table or spreadsheet must have a header row with the following column names (case-insensitive). Blank cells are safely kept empty.
             </p>
 
             <div style={{ overflowX: "auto" }}>
@@ -326,9 +379,9 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
                     { col: "Period", req: "Optional", type: "Integer (1 to 8)", sample: "1, 2, 3 ... 8", note: "Blank or invalid periods remain unset" },
                     { col: "Subject Code", req: "Optional", type: "Text", sample: "CS3351, 19CS501", note: "Stored as supplied; not inferred from the subject name" },
                     { col: "Subject Name", req: "Optional", type: "Text", sample: "Compiler Design", note: "Stored as supplied; not inferred from the subject code" },
-                    { col: "Subject Category", req: "Optional", type: "Category Tag", sample: "sub1, sub2, sub3, lab1, lab2, pe, oe, additional1, additional2", note: "Flexible slot classifier for staff & HOD timetables" },
+                    { col: "Subject Category", req: "Optional", type: "Category Tag", sample: "sub1, sub2, sub3, lab1, lab2, pe, oe", note: "Flexible slot classifier for staff & HOD timetables" },
                     { col: "Faculty Name", req: "Recommended", type: "Text", sample: "Dr. R. Saravanan", note: "Lecturer / professor name" },
-                    { col: "VMS No", req: "Optional", type: "Text", sample: "1944, 17433", note: "Faculty employee number (enables auto-sync to Teacher mode)" },
+                    { col: "MTS No", req: "Optional", type: "Text", sample: "1944, 17433", note: "Faculty employee number (enables auto-sync to Teacher mode)" },
                     { col: "Room No", req: "Optional", type: "Text", sample: "LH-201, CS-LAB-1", note: "Lecture hall or lab room number" },
                     { col: "Time Range", req: "Optional", type: "Text", sample: "08:05 - 08:55", note: "Stored as supplied; no default is inserted" },
                   ].map((item, idx) => (
@@ -379,28 +432,28 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx, .xls, .csv"
+            accept=".docx, .doc, .xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
             onChange={handleFileChange}
             style={{ display: "none" }}
           />
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
             <div style={{ width: "56px", height: "56px", borderRadius: "14px", backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileSpreadsheet size={28} />
+              {fileType === "doc" ? <FileText size={28} /> : <FileSpreadsheet size={28} />}
             </div>
 
             <div>
               <h4 style={{ margin: "0 0 0.25rem 0", fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)" }}>
-                {file ? file.name : "Click to select or drag & drop Timetable Excel file"}
+                {file ? file.name : "Click to select or drag & drop Timetable Word Document or Excel file"}
               </h4>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                Supports Microsoft Excel (.xlsx, .xls) and Comma-Separated Values (.csv)
+                Supports Microsoft Word (.docx, .doc), Microsoft Excel (.xlsx, .xls), and CSV (.csv)
               </p>
             </div>
 
             {file && (
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", padding: "0.3rem 0.75rem", borderRadius: "6px", backgroundColor: "rgba(34, 197, 94, 0.1)", color: "#22c55e", fontSize: "0.8rem", fontWeight: "700" }}>
-                <CheckCircle2 size={14} /> File loaded ({(file.size / 1024).toFixed(1)} KB)
+                <CheckCircle2 size={14} /> File loaded ({(file.size / 1024).toFixed(1)} KB) • {fileType === "doc" ? "Word Document" : "Spreadsheet"}
               </div>
             )}
           </div>
@@ -413,38 +466,34 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
         )}
 
         {uploadResult && (
-          <div style={{ 
-            marginTop: "1rem", 
-            padding: "0.85rem 1rem", 
-            borderRadius: "8px", 
-            backgroundColor: uploadResult.success ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)", 
-            border: `1px solid ${uploadResult.success ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`, 
-            color: uploadResult.success ? "#22c55e" : "#ef4444", 
-            fontSize: "0.85rem", 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "0.5rem" 
+          <div style={{
+            marginTop: "1rem",
+            padding: "0.85rem 1rem",
+            borderRadius: "8px",
+            backgroundColor: uploadResult.success ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+            border: `1px solid ${uploadResult.success ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+            color: uploadResult.success ? "#22c55e" : "#ef4444",
+            fontSize: "0.85rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
           }}>
             {uploadResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
             {uploadResult.message}
           </div>
         )}
 
-        {/* Action Bar when rows are parsed */}
         {parsedRows.length > 0 && (
-          <div style={{ marginTop: "1.5rem", borderTop: "1px solid var(--border-subtle)", paddingTop: "1.25rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+          <div style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
-              <div style={{ fontSize: "0.85rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Parsed Slots: </span>
-                <strong style={{ color: "var(--sky-blue)", fontSize: "1rem" }}>{parsedRows.length}</strong>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Rows Ready: <strong style={{ color: "var(--text-main)" }}>{parsedRows.length}</strong>
               </div>
-              <div style={{ fontSize: "0.85rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Classes: </span>
-                <strong style={{ color: "var(--text-main)" }}>{distinctClasses.length} ({distinctClasses.slice(0, 3).join(", ")}{distinctClasses.length > 3 ? "..." : ""})</strong>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Classes: <strong style={{ color: "var(--sky-blue)" }}>{distinctClasses.length}</strong>
               </div>
-              <div style={{ fontSize: "0.85rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Faculty Members: </span>
-                <strong style={{ color: "var(--text-main)" }}>{distinctFaculty.length}</strong>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Faculty: <strong style={{ color: "var(--text-main)" }}>{distinctFaculty.length}</strong>
               </div>
 
               {/* Mode Toggle */}
@@ -560,7 +609,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>SUBJECT CODE</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>SUBJECT NAME</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>FACULTY</th>
-                  <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>VMS NO</th>
+                  <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>MTS NO</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>ROOM</th>
                 </tr>
               </thead>
@@ -568,15 +617,15 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
                 {parsedRows.slice(0, 10).map((row, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                     <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{i + 1}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--sky-blue)" }}>{row.classId || "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--text-main)" }}>{row.dayOrder ? `Day ${row.dayOrder}` : "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700" }}>{row.period ? `P${row.period}` : "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.timeRange || "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", fontFamily: "monospace" }}>{row.subjectCode || "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-main)" }}>{row.subjectName || "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--sky-blue)" }}>{row.classId || "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--text-main)" }}>{row.dayOrder ? `Day ${row.dayOrder}` : "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700" }}>{row.period ? `P${row.period}` : "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.timeRange || "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", fontFamily: "monospace" }}>{row.subjectCode || "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-main)" }}>{row.subjectName || "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.facultyName || "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", color: "var(--sky-blue)" }}>{row.vmsNo || "—"}</td>
-                  <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.roomNo || "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.roomNo || "—"}</td>
                   </tr>
                 ))}
               </tbody>

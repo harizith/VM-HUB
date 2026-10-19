@@ -42,7 +42,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   subjectCode: ["code", "subjectcode", "coursecode"],
   subjectName: ["subject", "subjectname", "coursename"],
   facultyName: ["faculty", "facultyname", "teacher", "teachername", "instructor"],
-  vmsNo: ["vmsno", "vmno", "staffid", "facultynumber"],
+  vmsNo: ["vmsno", "vmno", "staffid", "facultynumber", "mtsno", "mts_no", "vms_no"],
   roomNo: ["room", "roomno", "classroom"],
   category: ["category", "subjectcategory"],
 };
