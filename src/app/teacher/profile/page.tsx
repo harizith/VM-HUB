@@ -261,17 +261,53 @@ export default function TeacherProfilePage() {
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 {[
-                  ["Subject 1", data.profile.subjects?.subject1],
-                  ["Subject 2", data.profile.subjects?.subject2],
-                  ["Lab 1", data.profile.subjects?.lab1],
-                  ["Additional 1", data.profile.subjects?.additional1],
-                  ["Additional 2", data.profile.subjects?.additional2],
-                ].map(([label, value]) => (
-                  <div key={label} style={{ padding: "0.9rem", borderRadius: "8px", backgroundColor: "var(--bg-card-header)" }}>
-                    <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>{label}</label>
-                    <div style={{ marginTop: "0.25rem", color: "var(--text-main)", fontWeight: 500 }}>{value || "Not assigned"}</div>
-                  </div>
-                ))}
+                  { key: "subject1", label: "Subject 1", value: data.profile.subjects?.subject1 },
+                  { key: "subject2", label: "Subject 2", value: data.profile.subjects?.subject2 },
+                  { key: "lab1", label: "Lab 1", value: data.profile.subjects?.lab1 },
+                  { key: "additional1", label: "Additional 1", value: data.profile.subjects?.additional1 },
+                  { key: "additional2", label: "Additional 2", value: data.profile.subjects?.additional2 },
+                ].map(({ key, label, value }) => {
+                  const assignedClasses: string[] = data.profile.subjectClasses?.[key] || [];
+                  return (
+                    <div key={key} style={{ padding: "0.9rem", borderRadius: "8px", backgroundColor: "var(--bg-card-header)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <div>
+                        <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>{label}</label>
+                        <div style={{ marginTop: "0.25rem", color: "var(--text-main)", fontWeight: 600, fontSize: "0.95rem" }}>
+                          {value || "Not assigned"}
+                        </div>
+                      </div>
+                      <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px dashed var(--border-subtle)" }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
+                          Assigned Classes:
+                        </span>
+                        {assignedClasses.length > 0 ? (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                            {assignedClasses.map((cls) => (
+                              <span
+                                key={cls}
+                                style={{
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  padding: "0.15rem 0.45rem",
+                                  borderRadius: "4px",
+                                  backgroundColor: "rgba(59, 130, 246, 0.15)",
+                                  color: "var(--royal-blue)",
+                                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                                }}
+                              >
+                                {cls}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                            {value ? "No classes scheduled yet" : "—"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

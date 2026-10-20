@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle } from "lucide-react";
+import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle, UserCheck } from "lucide-react";
 import AdminAgentChat from "@/components/AdminAgentChat";
 import AdminTimetablePdfUpload from "@/components/AdminTimetablePdfUpload";
 import AdminTimetableExcelUpload from "@/components/AdminTimetableExcelUpload";
 import AdminUserExcelUpload from "@/components/AdminUserExcelUpload";
 import CourseCatalog from "@/components/CourseCatalog";
+import TeacherSubjectAllocation from "@/components/TeacherSubjectAllocation";
 import OverallTimetable from "@/components/OverallTimetable";
 import Clock from "@/components/Clock";
 import AdminAutomationHub from "@/components/AdminAutomationHub";
@@ -33,10 +34,32 @@ interface UserItem {
     vmNo: string;
     department: string;
     designation: string;
+    subject1?: string | null;
+    subject2?: string | null;
+    lab1?: string | null;
+    additional1?: string | null;
+    additional2?: string | null;
   } | null;
 }
 interface DeptItem { id: string; code: string; name: string; hodName?: string; }
-interface SubjectItem { id: string; code: string; name: string; credits: number; semester: number; departmentCode: string; classesTaking?: string[]; facultiesHandling?: string[]; }
+interface SubjectItem {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  semester: number;
+  departmentCode: string;
+  classesTaking?: string[];
+  facultiesHandling?: string[];
+  scheduleSlots?: {
+    dayOrder: string;
+    period: number;
+    classId: string;
+    facultyName: string;
+    roomNo: string;
+    timeRange: string;
+  }[];
+}
 interface NoticeItem { id: string; title: string; content: string; category: string; postedBy: string; createdAt: string; }
 interface AuditLogItem {
   id: string;
@@ -66,7 +89,7 @@ interface TimetableEntry {
 
 export default function AdminPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "notices" | "timetable" | "audit" | "upload-timetable" | "upload-users" | "automation">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "teacher-allocations" | "notices" | "timetable" | "audit" | "upload-timetable" | "upload-users" | "automation">("users");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Role Subdivision Filter State
@@ -573,6 +596,7 @@ export default function AdminPage() {
               { id: "users", label: "User Accounts", Icon: Users, count: users.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
+              { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
               { id: "upload-timetable", label: "Timetable Import & Templates", Icon: FileText, count: 0 },
@@ -670,6 +694,7 @@ export default function AdminPage() {
                   {activeTab === "users" && "User Directory & Role Subdivisions"}
                   {activeTab === "depts" && "Academic Departments"}
                   {activeTab === "subjects" && "Course & Subject Catalog"}
+                  {activeTab === "teacher-allocations" && "Subject-Handling Teacher Allocations & Randomize Deck"}
                   {activeTab === "notices" && "System Announcements & Broadcasts"}
                   {activeTab === "timetable" && "Class Timetable Management"}
                   {activeTab === "upload-timetable" && "Timetable Import & Official Templates"}
@@ -854,6 +879,25 @@ export default function AdminPage() {
                 mode="admin"
                 departments={depts}
                 onCourseUpdated={fetchData}
+              />
+            )}
+
+            {/* SUBJECT-HANDLING TEACHER ALLOCATION & RANDOMIZE */}
+            {activeTab === "teacher-allocations" && (
+              <TeacherSubjectAllocation
+                departments={depts}
+                onCourseUpdated={fetchData}
+                onTimetableGenerated={(targetClassId) => {
+                  fetchData();
+                  // Switch to timetable tab to view generated timetable
+                  const parts = targetClassId.split("-");
+                  if (parts.length >= 3) {
+                    setSelectedYear(parts[0]);
+                    setSelectedDept(parts[1]);
+                    setSelectedSection(parts[2]);
+                  }
+                  setActiveTab("timetable");
+                }}
               />
             )}
 
@@ -1665,6 +1709,172 @@ export default function AdminPage() {
                         {selectedUser.facultyProfile ? `${selectedUser.facultyProfile.designation} • ${selectedUser.facultyProfile.department}` : "Not Set in DB"}
                       </strong>
                     </div>
+
+                    {(() => {
+                      const fp = selectedUser.facultyProfile;
+                      if (!fp) return null;
+
+                      // Helper to find classes for this teacher's subject from the subjects state
+                      const getClassesForSub = (subName: string | null | undefined): string[] => {
+                        if (!subName || !subName.trim()) return [];
+                        const sLower = subName.trim().toLowerCase();
+                        const foundSubject = subjects.find(
+                          (s) =>
+                            s.name.toLowerCase() === sLower ||
+                            s.code.toLowerCase() === sLower ||
+                            s.name.toLowerCase().includes(sLower) ||
+                            sLower.includes(s.name.toLowerCase())
+                        );
+                        if (!foundSubject || !foundSubject.scheduleSlots) return foundSubject?.classesTaking || [];
+
+                        // Filter schedule slots specifically handled by this teacher
+                        const teacherNameLower = (selectedUser.name || "").toLowerCase();
+                        const vmNoStr = selectedUser.vmNo || fp.vmNo || "";
+                        const matchingSlots = foundSubject.scheduleSlots.filter((slot: any) => {
+                          const fn = (slot.facultyName || "").toLowerCase();
+                          return (
+                            (fn && (fn.includes(teacherNameLower) || teacherNameLower.includes(fn))) ||
+                            (vmNoStr && fn.includes(vmNoStr))
+                          );
+                        });
+
+                        if (matchingSlots.length > 0) {
+                          return Array.from(new Set(matchingSlots.map((s: any) => s.classId).filter(Boolean)));
+                        }
+                        return foundSubject.classesTaking || [];
+                      };
+
+                      const coreSubjects = [
+                        { tag: "Sub 1", val: fp.subject1, color: "var(--royal-blue)", bg: "rgba(59, 130, 246, 0.15)" },
+                        { tag: "Sub 2", val: fp.subject2, color: "var(--royal-blue)", bg: "rgba(59, 130, 246, 0.15)" },
+                        { tag: "Lab 1", val: fp.lab1, color: "#d97706", bg: "rgba(245, 158, 11, 0.15)" },
+                      ].filter((s) => Boolean(s.val));
+
+                      const additionalSubjects = [
+                        { tag: "Add 1", val: fp.additional1, color: "#a855f7", bg: "rgba(168, 85, 247, 0.15)" },
+                        { tag: "Add 2", val: fp.additional2, color: "#a855f7", bg: "rgba(168, 85, 247, 0.15)" },
+                      ].filter((s) => Boolean(s.val));
+
+                      return (
+                        <>
+                          {coreSubjects.length > 0 && (
+                            <div>
+                              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block", marginBottom: "0.45rem", fontWeight: "700" }}>
+                                Assigned Core Teaching Subjects & Classes
+                              </span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                {coreSubjects.map((s, idx) => {
+                                  const classes = getClassesForSub(s.val);
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        padding: "0.6rem 0.75rem",
+                                        borderRadius: "8px",
+                                        backgroundColor: "var(--bg-card-header)",
+                                        border: "1px solid var(--border-subtle)",
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                                        <span style={{ padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", backgroundColor: s.bg, color: s.color, fontWeight: "700" }}>
+                                          {s.tag}
+                                        </span>
+                                        <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-main)", flex: 1 }}>
+                                          {s.val}
+                                        </span>
+                                      </div>
+                                      <div style={{ marginTop: "0.4rem", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Assigned Classes:</span>
+                                        {classes.length > 0 ? (
+                                          classes.map((cls) => (
+                                            <span
+                                              key={cls}
+                                              style={{
+                                                fontSize: "0.72rem",
+                                                fontWeight: "700",
+                                                padding: "0.1rem 0.4rem",
+                                                borderRadius: "4px",
+                                                backgroundColor: "rgba(56, 189, 248, 0.15)",
+                                                color: "var(--sky-blue)",
+                                                border: "1px solid rgba(56, 189, 248, 0.3)",
+                                              }}
+                                            >
+                                              {cls}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                            No classes assigned yet
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {additionalSubjects.length > 0 && (
+                            <div style={{ marginTop: "0.5rem" }}>
+                              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block", marginBottom: "0.45rem", fontWeight: "700" }}>
+                                Additional Assignments & Classes
+                              </span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                {additionalSubjects.map((s, idx) => {
+                                  const classes = getClassesForSub(s.val);
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        padding: "0.6rem 0.75rem",
+                                        borderRadius: "8px",
+                                        backgroundColor: "var(--bg-card-header)",
+                                        border: "1px solid var(--border-subtle)",
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                                        <span style={{ padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", backgroundColor: s.bg, color: s.color, fontWeight: "700" }}>
+                                          {s.tag}
+                                        </span>
+                                        <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-main)", flex: 1 }}>
+                                          {s.val}
+                                        </span>
+                                      </div>
+                                      <div style={{ marginTop: "0.4rem", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Assigned Classes:</span>
+                                        {classes.length > 0 ? (
+                                          classes.map((cls) => (
+                                            <span
+                                              key={cls}
+                                              style={{
+                                                fontSize: "0.72rem",
+                                                fontWeight: "700",
+                                                padding: "0.1rem 0.4rem",
+                                                borderRadius: "4px",
+                                                backgroundColor: "rgba(168, 85, 247, 0.15)",
+                                                color: "#a855f7",
+                                                border: "1px solid rgba(168, 85, 247, 0.3)",
+                                              }}
+                                            >
+                                              {cls}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                            No classes assigned yet
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
 

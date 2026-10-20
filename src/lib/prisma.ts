@@ -521,11 +521,16 @@ export const prisma: PrismaClient = new Proxy(
               return async (...args: any[]) => {
                 try {
                   const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("DB timeout")), 3500)
+                    setTimeout(() => reject(new Error("Supabase Database connection timed out after 15s")), 15000)
                   );
                   return await Promise.race([(target as any)[method](...args), timeoutPromise]);
-                } catch {
-                  return (handler as any)[method](...args);
+                } catch (err: any) {
+                  console.error(`[DB Query Error on ${String(prop)}.${method}]:`, err?.message || err);
+                  // Only fallback if realPrisma is not available or explicitly disconnected
+                  if (!process.env.DATABASE_URL) {
+                    return (handler as any)[method](...args);
+                  }
+                  throw err;
                 }
               };
             },

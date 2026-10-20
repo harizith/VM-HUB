@@ -107,7 +107,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { classId } = body;
+    const { classId, teacherAssignments } = body;
 
     if (!classId) {
       return NextResponse.json({ success: false, error: 'classId is required' }, { status: 400 });
@@ -187,15 +187,32 @@ export async function POST(request: Request) {
       const isLab = isLabCourse(name, code, existingMeta?.category);
       const defaultCategory = isLab ? `lab${(idx % 2) + 1}` : `sub${(idx % 4) + 1}`;
 
+      // Check if user passed an explicit teacher assignment for this subject code
+      const explicitAssignment = teacherAssignments && typeof teacherAssignments === 'object'
+        ? (teacherAssignments[code] || teacherAssignments[sub.code] || null)
+        : null;
+
+      const facultyName = explicitAssignment?.facultyName !== undefined
+        ? explicitAssignment.facultyName
+        : (existingMeta?.facultyName || null);
+
+      const vmsNo = explicitAssignment?.vmsNo !== undefined
+        ? explicitAssignment.vmsNo
+        : (existingMeta?.vmsNo || null);
+
+      const roomNo = explicitAssignment?.roomNo !== undefined
+        ? explicitAssignment.roomNo
+        : (existingMeta?.roomNo || null);
+
       return {
         code,
         name,
         isLab,
         category: existingMeta?.category || defaultCategory,
         credits: sub.credits || 3,
-        facultyName: existingMeta?.facultyName || null,
-        vmsNo: existingMeta?.vmsNo || null,
-        roomNo: existingMeta?.roomNo || null,
+        facultyName,
+        vmsNo,
+        roomNo,
       };
     });
 

@@ -41,25 +41,83 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Profile not found." }, { status: 404 });
     }
 
+    const vmNo = user.vmNo || user.facultyProfile?.vmNo || "";
+    const teacherName = user.name || "";
+
+    // Query all timetable entries assigned to this teacher to get the classes taking each subject
+    let timetableEntries: any[] = [];
+    try {
+      timetableEntries = await prisma.timetableEntry.findMany({
+        where: {
+          OR: [
+            ...(vmNo ? [{ vmsNo: vmNo }] : []),
+            ...(teacherName ? [{ facultyName: { equals: teacherName, mode: "insensitive" as const } }] : []),
+          ],
+        },
+        select: {
+          subjectName: true,
+          subjectCode: true,
+          classId: true,
+        },
+      });
+    } catch (ttErr) {
+      console.warn("Failed to fetch timetable classes for teacher profile:", ttErr);
+    }
+
+    // Helper to get unique classes assigned to a subject name or code
+    const getClassesForSubject = (subjectStr: string | null | undefined): string[] => {
+      if (!subjectStr || !subjectStr.trim()) return [];
+      const sLower = subjectStr.trim().toLowerCase();
+      const matched = timetableEntries.filter((e) => {
+        const eName = (e.subjectName || "").toLowerCase();
+        const eCode = (e.subjectCode || "").toLowerCase();
+        return (
+          eName === sLower ||
+          eCode === sLower ||
+          (eName && sLower.includes(eName)) ||
+          (sLower && eName.includes(sLower)) ||
+          (eCode && sLower.includes(eCode))
+        );
+      });
+      return Array.from(new Set(matched.map((m) => m.classId).filter(Boolean)));
+    };
+
+    const s1 = user.facultyProfile?.subject1 || "";
+    const s2 = user.facultyProfile?.subject2 || "";
+    const l1 = user.facultyProfile?.lab1 || "";
+    const a1 = user.facultyProfile?.additional1 || "";
+    const a2 = user.facultyProfile?.additional2 || "";
+
+    // Also get all distinct classes the teacher handles overall
+    const allAssignedClasses = Array.from(new Set(timetableEntries.map((e) => e.classId).filter(Boolean)));
+
     return NextResponse.json({
       success: true,
       data: {
         name: user.name,
         email: user.email,
-        vmNo: user.vmNo || (user.facultyProfile?.vmNo || ""),
+        vmNo,
         status: user.status,
         profile: {
           department: user.facultyProfile?.department || "",
           designation: user.facultyProfile?.designation || "",
           subjects: {
-            subject1: user.facultyProfile?.subject1 || "",
-            subject2: user.facultyProfile?.subject2 || "",
-            lab1: user.facultyProfile?.lab1 || "",
-            additional1: user.facultyProfile?.additional1 || "",
-            additional2: user.facultyProfile?.additional2 || "",
+            subject1: s1,
+            subject2: s2,
+            lab1: l1,
+            additional1: a1,
+            additional2: a2,
           },
-        }
-      }
+          subjectClasses: {
+            subject1: getClassesForSubject(s1),
+            subject2: getClassesForSubject(s2),
+            lab1: getClassesForSubject(l1),
+            additional1: getClassesForSubject(a1),
+            additional2: getClassesForSubject(a2),
+          },
+          allAssignedClasses,
+        },
+      },
     });
 
   } catch (error: any) {

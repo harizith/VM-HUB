@@ -1,0 +1,1126 @@
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  BookOpen,
+  UserCheck,
+  Shuffle,
+  Calendar,
+  Building2,
+  GraduationCap,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  RefreshCw,
+  Search,
+  Filter,
+  Users,
+  MapPin,
+  Clock,
+  ArrowRight,
+  Plus,
+  Trash2,
+  X
+} from "lucide-react";
+
+interface TeacherItem {
+  id: string;
+  name: string;
+  vmNo?: string | null;
+  role: string;
+  department?: string | null;
+  designation?: string | null;
+  subject1?: string | null;
+  subject2?: string | null;
+  lab1?: string | null;
+  additional1?: string | null;
+  additional2?: string | null;
+}
+
+interface SubjectItem {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  semester: number;
+  departmentCode: string;
+}
+
+interface TeacherAllocationProps {
+  departments: { code: string; name: string }[];
+  onTimetableGenerated?: (classId: string) => void;
+  onCourseUpdated?: () => void;
+}
+
+export default function TeacherSubjectAllocation({
+  departments = [],
+  onTimetableGenerated,
+  onCourseUpdated,
+}: TeacherAllocationProps) {
+  // Target Class Selection
+  const [selectedDept, setSelectedDept] = useState<string>("CSE");
+  const [selectedYear, setSelectedYear] = useState<string>("II");
+  const [selectedSection, setSelectedSection] = useState<string>("A");
+
+  // Data State
+  const [catalogSubjects, setCatalogSubjects] = useState<SubjectItem[]>([]);
+  const [teachers, setTeachers] = useState<TeacherItem[]>([]);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  // Subject-to-Teacher Mappings: subjectCode -> { facultyName, vmsNo, roomNo }
+  const [assignments, setAssignments] = useState<
+    Record<string, { facultyName: string; vmsNo: string; roomNo: string }>
+  >({});
+
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<"ALL" | "LAB" | "THEORY">("ALL");
+
+  // Execution State
+  const [isRandomizing, setIsRandomizing] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
+
+  // Subject Management Modal State (Create subject in Course Catalog directly from Allocation view)
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [newSubCode, setNewSubCode] = useState("");
+  const [newSubName, setNewSubName] = useState("");
+  const [newSubCredits, setNewSubCredits] = useState("3");
+  const [newSubSem, setNewSubSem] = useState("3");
+  const [newSubDept, setNewSubDept] = useState("CSE");
+  const [creatingSubject, setCreatingSubject] = useState(false);
+  const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null);
+
+  // Computed Class ID (e.g. "II-CSE-A")
+  const computedClassId = useMemo(() => {
+    return `${selectedYear}-${selectedDept}-${selectedSection}`;
+  }, [selectedYear, selectedDept, selectedSection]);
+
+  // Compute semester number from academic year
+  const computedSemester = useMemo(() => {
+    if (selectedYear === "I") return 1;
+    if (selectedYear === "II") return 3;
+    if (selectedYear === "III") return 5;
+    if (selectedYear === "IV") return 7;
+    return 3;
+  }, [selectedYear]);
+
+  // Fetch teachers and catalog subjects
+  const loadData = async () => {
+    try {
+      setRefreshing(true);
+      // 1. Fetch Teachers from /api/admin/users
+      const usersRes = await fetch("/api/admin/users").then((r) => r.json());
+      if (usersRes.success && usersRes.users) {
+        const teacherList: TeacherItem[] = usersRes.users
+          .filter((u: any) => u.role === "FACULTY" || u.role === "HOD")
+          .map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            vmNo: u.facultyProfile?.vmNo || u.vmNo || null,
+            role: u.role,
+            department: u.facultyProfile?.department || null,
+            designation: u.facultyProfile?.designation || null,
+            subject1: u.facultyProfile?.subject1 || null,
+            subject2: u.facultyProfile?.subject2 || null,
+            lab1: u.facultyProfile?.lab1 || null,
+            additional1: u.facultyProfile?.additional1 || null,
+            additional2: u.facultyProfile?.additional2 || null,
+          }));
+        setTeachers(teacherList);
+      }
+
+      // 2. Fetch Catalog Subjects
+      const subjectsRes = await fetch("/api/admin/subjects").then((r) => r.json());
+      if (subjectsRes.success && subjectsRes.subjects) {
+        setCatalogSubjects(subjectsRes.subjects);
+      }
+    } catch (err: any) {
+      console.error("Error loading allocation data:", err);
+      setStatusMessage({ type: "error", text: "Failed to load faculty and course catalog." });
+    } finally {
+      setLoadingData(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Filter subjects for the selected department and relevant semester
+  const relevantSubjects = useMemo(() => {
+    return catalogSubjects.filter((s) => {
+      const matchDept =
+        !selectedDept ||
+        s.departmentCode.toUpperCase() === selectedDept.toUpperCase() ||
+        s.departmentCode.toUpperCase() === "ALL";
+
+      // Match semester (e.g., Year II matches semester 3 or 4)
+      const allowedSems = [computedSemester, computedSemester + 1];
+      const matchSem = allowedSems.includes(s.semester);
+
+      // Search query
+      const matchSearch =
+        !searchQuery ||
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.code.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Lab vs Theory
+      const isLab = s.name.toLowerCase().includes("lab") || s.code.toLowerCase().includes("lab");
+      const matchType =
+        filterType === "ALL" ? true : filterType === "LAB" ? isLab : !isLab;
+
+      return matchDept && matchSem && matchSearch && matchType;
+    });
+  }, [catalogSubjects, selectedDept, computedSemester, searchQuery, filterType]);
+
+  // Check if subject is Lab
+  const checkIfLab = (sub: SubjectItem) => {
+    const text = `${sub.name} ${sub.code}`.toLowerCase();
+    return text.includes("lab") || text.includes("practical") || text.includes("workshop");
+  };
+
+  // Update assignment for a subject
+  const handleTeacherSelect = (subCode: string, teacherName: string) => {
+    const matchedTeacher = teachers.find((t) => t.name === teacherName);
+    setAssignments((prev) => ({
+      ...prev,
+      [subCode]: {
+        facultyName: teacherName,
+        vmsNo: matchedTeacher?.vmNo || "",
+        roomNo: prev[subCode]?.roomNo || (subCode.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201"),
+      },
+    }));
+  };
+
+  const handleRoomChange = (subCode: string, roomNo: string) => {
+    setAssignments((prev) => ({
+      ...prev,
+      [subCode]: {
+        facultyName: prev[subCode]?.facultyName || "",
+        vmsNo: prev[subCode]?.vmsNo || "",
+        roomNo,
+      },
+    }));
+  };
+
+  // Auto-fill unassigned subjects: prioritize teachers whose profile teaching assignments match this subject
+  const handleAutoAssignTeachers = () => {
+    if (teachers.length === 0) {
+      alert("No faculty members registered in system. Please add faculty in User Accounts first.");
+      return;
+    }
+
+    const updated = { ...assignments };
+    relevantSubjects.forEach((sub, idx) => {
+      if (!updated[sub.code]?.facultyName) {
+        // Priority 1: Check if any teacher has this course code/title in their profile teaching assignments
+        const subNameLower = sub.name.toLowerCase();
+        const subCodeLower = sub.code.toLowerCase();
+
+        const profileMatchedTeacher = teachers.find((t) => {
+          const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
+            .filter(Boolean)
+            .map((s) => String(s).toLowerCase().trim());
+
+          return profileSubjects.some(
+            (ps) => ps === subCodeLower || ps === subNameLower || subNameLower.includes(ps) || ps.includes(subNameLower)
+          );
+        });
+
+        // Priority 2: Fallback to department matching faculty in round-robin
+        const deptTeachers = teachers.filter(
+          (t) => !t.department || t.department.toUpperCase() === selectedDept.toUpperCase()
+        );
+        const pool = deptTeachers.length > 0 ? deptTeachers : teachers;
+        const assignedTeacher = profileMatchedTeacher || pool[idx % pool.length];
+
+        updated[sub.code] = {
+          facultyName: assignedTeacher.name,
+          vmsNo: assignedTeacher.vmNo || "",
+          roomNo: checkIfLab(sub) ? `LAB-${(idx % 3) + 1}` : `LH-${200 + (idx % 4) + 1}`,
+        };
+      }
+    });
+
+    setAssignments(updated);
+    setStatusMessage({
+      type: "info",
+      text: `Auto-mapped teachers to ${relevantSubjects.length} subjects for ${computedClassId} (prioritizing profile teaching assignments).`,
+    });
+  };
+
+  // Clear all selections for current view
+  const handleClearAssignments = () => {
+    if (!confirm("Clear selected teacher assignments for this view?")) return;
+    setAssignments({});
+    setStatusMessage(null);
+  };
+
+  // Create subject in Course Catalog from allocation tab
+  const handleOpenCreateModal = () => {
+    setNewSubDept(selectedDept);
+    setNewSubSem(computedSemester.toString());
+    setNewSubCode("");
+    setNewSubName("");
+    setNewSubCredits("3");
+    setShowAddSubjectModal(true);
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubCode.trim() || !newSubName.trim()) {
+      alert("Please provide both Subject Code and Name.");
+      return;
+    }
+
+    try {
+      setCreatingSubject(true);
+      const res = await fetch("/api/admin/subjects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: newSubCode.trim().toUpperCase(),
+          name: newSubName.trim(),
+          credits: parseInt(newSubCredits) || 3,
+          semester: parseInt(newSubSem) || computedSemester,
+          departmentCode: newSubDept || selectedDept,
+        }),
+      }).then((r) => r.json());
+
+      if (res.success) {
+        setShowAddSubjectModal(false);
+        setNewSubCode("");
+        setNewSubName("");
+        setStatusMessage({
+          type: "success",
+          text: `Subject "${res.subject.code} - ${res.subject.name}" successfully added to Course Catalog!`,
+        });
+        await loadData();
+        if (onCourseUpdated) onCourseUpdated();
+      } else {
+        alert(res.error || "Failed to create subject.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to create subject.");
+    } finally {
+      setCreatingSubject(false);
+    }
+  };
+
+  // Delete subject from Course Catalog
+  const handleDeleteSubject = async (sub: SubjectItem) => {
+    if (!confirm(`Are you sure you want to delete course "${sub.code} - ${sub.name}" from the Course Catalog?`)) {
+      return;
+    }
+
+    try {
+      setDeletingSubjectId(sub.id);
+      const res = await fetch(`/api/admin/subjects?id=${encodeURIComponent(sub.id)}`, {
+        method: "DELETE",
+      }).then((r) => r.json());
+
+      if (res.success) {
+        // Also remove from assignments if mapped
+        setAssignments((prev) => {
+          const next = { ...prev };
+          delete next[sub.code];
+          return next;
+        });
+        setStatusMessage({
+          type: "info",
+          text: `Subject "${sub.code}" removed from Course Catalog and allocation list.`,
+        });
+        await loadData();
+        if (onCourseUpdated) onCourseUpdated();
+      } else {
+        alert(res.error || "Failed to delete subject.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete subject.");
+    } finally {
+      setDeletingSubjectId(null);
+    }
+  };
+
+  // Trigger Randomize Timetable with Selected Subject-Teacher Mappings
+  const handleExecuteRandomize = async () => {
+    setIsRandomizing(true);
+    setStatusMessage(null);
+
+    try {
+      // Build teacherAssignments dictionary for the API payload
+      const payloadAssignments: Record<
+        string,
+        { facultyName: string | null; vmsNo: string | null; roomNo: string | null }
+      > = {};
+
+      Object.entries(assignments).forEach(([code, val]) => {
+        if (val.facultyName) {
+          payloadAssignments[code] = {
+            facultyName: val.facultyName,
+            vmsNo: val.vmsNo || null,
+            roomNo: val.roomNo || null,
+          };
+        }
+      });
+
+      const res = await fetch("/api/admin/timetable/randomize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classId: computedClassId,
+          teacherAssignments: payloadAssignments,
+        }),
+      }).then((r) => r.json());
+
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: `Timetable for ${computedClassId} successfully scheduled & randomized with selected subject teachers! (Filled ${res.filledCount || 0} periods).`,
+        });
+        if (onTimetableGenerated) {
+          onTimetableGenerated(computedClassId);
+        }
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: res.error || "Failed to randomize timetable.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err.message || "Network error while running randomize engine.",
+      });
+    } finally {
+      setIsRandomizing(false);
+    }
+  };
+
+  const assignedCount = relevantSubjects.filter(
+    (s) => assignments[s.code]?.facultyName
+  ).length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Top Banner & Control Deck */}
+      <div
+        className="premium-card"
+        style={{
+          background: "linear-gradient(135deg, rgba(30, 64, 175, 0.25) 0%, rgba(14, 165, 233, 0.15) 100%)",
+          border: "1px solid rgba(56, 189, 248, 0.3)",
+          padding: "1.75rem",
+          borderRadius: "16px",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  padding: "0.2rem 0.6rem",
+                  borderRadius: "9999px",
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
+                  backgroundColor: "rgba(56, 189, 248, 0.2)",
+                  color: "var(--sky-blue)",
+                  border: "1px solid rgba(56, 189, 248, 0.35)",
+                }}
+              >
+                <UserCheck size={14} /> Subject Allocation & Randomizer Deck
+              </span>
+              <span
+                style={{
+                  padding: "0.2rem 0.6rem",
+                  borderRadius: "9999px",
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
+                  backgroundColor: "rgba(168, 85, 247, 0.2)",
+                  color: "#c084fc",
+                }}
+              >
+                Rule Compliant (Max 6P • Non-consecutive • Daily)
+              </span>
+            </div>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: "700", margin: "0.25rem 0", color: "var(--text-main)" }}>
+              Subject-Handling Teacher Allocations
+            </h2>
+            <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)", maxWidth: "680px" }}>
+              Select which professor or lecturer handles each catalog course for the selected class.
+              Then click <strong>Run Randomize with Selected Teachers</strong> to generate a fully compliant timetable.
+            </p>
+          </div>
+
+          <button
+            onClick={loadData}
+            disabled={refreshing}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              padding: "0.5rem 0.9rem",
+              borderRadius: "8px",
+              border: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-card)",
+              color: "var(--text-main)",
+              fontSize: "0.85rem",
+              fontWeight: "600",
+              cursor: refreshing ? "not-allowed" : "pointer",
+            }}
+          >
+            <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh Data
+          </button>
+        </div>
+
+        {/* Class Selection Strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "1rem",
+            marginTop: "1.5rem",
+            padding: "1rem",
+            backgroundColor: "var(--bg-card)",
+            borderRadius: "12px",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+              <Building2 size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
+              DEPARTMENT
+            </label>
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="premium-input"
+              style={{ width: "100%", fontSize: "0.85rem" }}
+            >
+              {(departments.length > 0 ? departments : [{ code: "CSE", name: "CSE" }, { code: "ECE", name: "ECE" }, { code: "IT", name: "IT" }, { code: "MECH", name: "MECH" }]).map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.code} - {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+              <GraduationCap size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
+              ACADEMIC YEAR
+            </label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="premium-input"
+              style={{ width: "100%", fontSize: "0.85rem" }}
+            >
+              <option value="I">Year I (Sem 1-2)</option>
+              <option value="II">Year II (Sem 3-4)</option>
+              <option value="III">Year III (Sem 5-6)</option>
+              <option value="IV">Year IV (Sem 7-8)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+              <Users size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
+              SECTION
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="premium-input"
+              style={{ width: "100%", fontSize: "0.85rem" }}
+            >
+              <option value="A">Section A</option>
+              <option value="B">Section B</option>
+              <option value="C">Section C</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                padding: "0.6rem 0.9rem",
+                borderRadius: "8px",
+                backgroundColor: "var(--bg-input)",
+                border: "1px solid var(--border-subtle)",
+                textAlign: "center",
+              }}
+            >
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>TARGET CLASS</span>
+              <strong style={{ fontSize: "1rem", color: "var(--sky-blue)", letterSpacing: "0.03em" }}>{computedClassId}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action / Randomize Summary Bar */}
+      <div
+        className="premium-card"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
+          padding: "1rem 1.5rem",
+          backgroundColor: "var(--bg-card)",
+          borderRadius: "12px",
+          border: "1px solid var(--border-subtle)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Subjects In Catalog</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-main)" }}>
+              {relevantSubjects.length}
+            </div>
+          </div>
+          <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border-subtle)" }} />
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Teachers Mapped</span>
+            <div style={{ fontSize: "1.2rem", fontWeight: "700", color: assignedCount > 0 ? "#10b981" : "var(--text-muted)" }}>
+              {assignedCount} / {relevantSubjects.length}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <button
+            onClick={handleAutoAssignTeachers}
+            style={{
+              padding: "0.6rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-input)",
+              color: "var(--text-main)",
+              fontSize: "0.85rem",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            Auto-Fill Teachers Evenly
+          </button>
+
+          <button
+            onClick={handleClearAssignments}
+            style={{
+              padding: "0.6rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              backgroundColor: "rgba(239, 68, 68, 0.08)",
+              color: "#ef4444",
+              fontSize: "0.85rem",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            Clear Mappings
+          </button>
+
+          <button
+            onClick={handleExecuteRandomize}
+            disabled={isRandomizing || relevantSubjects.length === 0}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.65rem 1.35rem",
+              borderRadius: "8px",
+              border: "none",
+              backgroundColor: "var(--royal-blue)",
+              color: "white",
+              fontSize: "0.9rem",
+              fontWeight: "700",
+              cursor: isRandomizing || relevantSubjects.length === 0 ? "not-allowed" : "pointer",
+              boxShadow: "0 4px 14px rgba(29, 78, 216, 0.35)",
+              opacity: isRandomizing ? 0.7 : 1,
+            }}
+          >
+            <Shuffle size={16} />
+            {isRandomizing ? "Randomizing Timetable..." : `Run Randomize with Selected Teachers`}
+          </button>
+        </div>
+      </div>
+
+      {/* Notifications / Alerts */}
+      {statusMessage && (
+        <div
+          style={{
+            padding: "1rem 1.25rem",
+            borderRadius: "10px",
+            border:
+              statusMessage.type === "success"
+                ? "1px solid #10b981"
+                : statusMessage.type === "error"
+                ? "1px solid #ef4444"
+                : "1px solid var(--sky-blue)",
+            backgroundColor:
+              statusMessage.type === "success"
+                ? "rgba(16, 185, 129, 0.12)"
+                : statusMessage.type === "error"
+                ? "rgba(239, 68, 68, 0.12)"
+                : "rgba(56, 189, 248, 0.12)",
+            color:
+              statusMessage.type === "success"
+                ? "#10b981"
+                : statusMessage.type === "error"
+                ? "#ef4444"
+                : "var(--sky-blue)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontSize: "0.9rem",
+            fontWeight: "600",
+          }}
+        >
+          {statusMessage.type === "success" ? (
+            <CheckCircle2 size={18} />
+          ) : statusMessage.type === "error" ? (
+            <AlertCircle size={18} />
+          ) : (
+            <HelpCircle size={18} />
+          )}
+          <span>{statusMessage.text}</span>
+        </div>
+      )}
+
+      {/* Course & Teacher Assignment Table */}
+      <div
+        className="premium-card"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderRadius: "12px",
+          border: "1px solid var(--border-subtle)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "1rem 1.25rem",
+            borderBottom: "1px solid var(--border-subtle)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <BookOpen size={18} style={{ color: "var(--sky-blue)" }} />
+            <span style={{ fontWeight: "700", fontSize: "0.95rem", color: "var(--text-main)" }}>
+              {selectedDept} Semester {computedSemester} Subjects ({relevantSubjects.length})
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            {/* Search */}
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                placeholder="Search subject or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  padding: "0.45rem 0.75rem 0.45rem 2rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border-subtle)",
+                  backgroundColor: "var(--bg-input)",
+                  color: "var(--text-main)",
+                  fontSize: "0.8rem",
+                  width: "190px",
+                }}
+              />
+              <Search size={13} style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+            </div>
+
+            {/* Filter */}
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as any)}
+              style={{
+                padding: "0.45rem 0.6rem",
+                borderRadius: "6px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+              }}
+            >
+              <option value="ALL">All Types</option>
+              <option value="THEORY">Theory Only</option>
+              <option value="LAB">Labs Only</option>
+            </select>
+            {/* Add Subject to Catalog Button */}
+            <button
+              onClick={handleOpenCreateModal}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                padding: "0.45rem 0.75rem",
+                borderRadius: "6px",
+                border: "none",
+                backgroundColor: "var(--sky-blue)",
+                color: "#0f172a",
+                fontSize: "0.8rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Plus size={14} /> Add Course
+            </button>
+          </div>
+        </div>
+
+        {loadingData ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+            Loading course catalog and faculty directory...
+          </div>
+        ) : relevantSubjects.length === 0 ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+            <p style={{ margin: "0 0 0.5rem 0", fontWeight: "600", fontSize: "1rem" }}>No subjects found for {selectedDept} Semester {computedSemester}</p>
+            <span style={{ fontSize: "0.85rem", display: "block", marginBottom: "1rem" }}>
+              Add a new course directly below or from the Course Catalog.
+            </span>
+            <button
+              onClick={handleOpenCreateModal}
+              style={{
+                padding: "0.5rem 1rem",
+                borderRadius: "6px",
+                border: "none",
+                backgroundColor: "var(--royal-blue)",
+                color: "#fff",
+                fontWeight: "600",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}
+            >
+              <Plus size={15} /> Add Subject for Semester {computedSemester}
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
+              <thead style={{ backgroundColor: "var(--bg-card-header)", borderBottom: "1px solid var(--border-subtle)" }}>
+                <tr>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>CODE</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600" }}>SUBJECT NAME</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "80px" }}>TYPE</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", minWidth: "250px" }}>ASSIGNED TEACHER / FACULTY</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>MTS NO</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "80px", textAlign: "center" }}>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relevantSubjects.map((sub, idx) => {
+                  const isLab = checkIfLab(sub);
+                  const currentAssignment = assignments[sub.code] || {
+                    facultyName: "",
+                    vmsNo: "",
+                    roomNo: isLab ? "CS-LAB-1" : "LH-201",
+                  };
+
+                  return (
+                    <tr
+                      key={sub.code || sub.id}
+                      style={{
+                        borderBottom: "1px solid var(--border-subtle)",
+                        backgroundColor: currentAssignment.facultyName ? "rgba(16, 185, 129, 0.03)" : "transparent",
+                      }}
+                    >
+                      <td style={{ padding: "0.75rem 1rem", fontWeight: "700", fontFamily: "monospace", color: "var(--sky-blue)" }}>
+                        {sub.code}
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: "500" }}>
+                        <div>{sub.name}</div>
+                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                          Credits: {sub.credits} • Sem {sub.semester}
+                        </span>
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        <span
+                          style={{
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "4px",
+                            fontSize: "0.7rem",
+                            fontWeight: "700",
+                            backgroundColor: isLab ? "rgba(245, 158, 11, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                            color: isLab ? "#f59e0b" : "var(--royal-blue)",
+                          }}
+                        >
+                          {isLab ? "LAB" : "THEORY"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        <select
+                          value={currentAssignment.facultyName}
+                          onChange={(e) => handleTeacherSelect(sub.code, e.target.value)}
+                          className="premium-input"
+                          style={{ width: "100%", padding: "0.4rem 0.6rem", fontSize: "0.85rem" }}
+                        >
+                          <option value="">-- Choose Handling Teacher --</option>
+                          {teachers.map((t) => {
+                            const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
+                              .filter(Boolean)
+                              .map(s => String(s).trim());
+
+                            const subNameLower = sub.name.toLowerCase();
+                            const subCodeLower = sub.code.toLowerCase();
+                            const hasProfileMatch = profileSubjects.some(ps => {
+                              const psl = ps.toLowerCase();
+                              return psl === subCodeLower || psl === subNameLower || subNameLower.includes(psl) || psl.includes(subNameLower);
+                            });
+
+                            const subjectBadge = profileSubjects.length > 0
+                              ? ` • Profile: ${profileSubjects.slice(0, 2).join(", ")}`
+                              : "";
+
+                            return (
+                              <option key={t.id} value={t.name}>
+                                {hasProfileMatch ? "★ " : ""}{t.name} {t.vmNo ? `(MTS: ${t.vmNo})` : ""} [{t.role}]{subjectBadge}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                        {currentAssignment.vmsNo || "—"}
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem", textAlign: "center" }}>
+                        <button
+                          onClick={() => handleDeleteSubject(sub)}
+                          disabled={deletingSubjectId === sub.id}
+                          title={`Delete ${sub.code} from Course Catalog`}
+                          style={{
+                            padding: "0.35rem 0.55rem",
+                            borderRadius: "6px",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            backgroundColor: "rgba(239, 68, 68, 0.08)",
+                            color: "#ef4444",
+                            cursor: deletingSubjectId === sub.id ? "not-allowed" : "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* CREATE SUBJECT MODAL */}
+      {showAddSubjectModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "1rem",
+          }}
+          onClick={() => setShowAddSubjectModal(false)}
+        >
+          <div
+            className="premium-card"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderRadius: "12px",
+              border: "1px solid var(--border-subtle)",
+              width: "100%",
+              maxWidth: "480px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: "1rem 1.25rem",
+                borderBottom: "1px solid var(--border-subtle)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <BookOpen size={18} style={{ color: "var(--sky-blue)" }} />
+                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: "700", color: "var(--text-main)" }}>
+                  Add Course to Catalog
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAddSubjectModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "0.25rem",
+                  borderRadius: "4px",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubject} style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "600", display: "block", marginBottom: "0.35rem" }}>
+                  SUBJECT CODE *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 231CS321 or CS3301"
+                  value={newSubCode}
+                  onChange={(e) => setNewSubCode(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", padding: "0.55rem 0.75rem", fontSize: "0.85rem", textTransform: "uppercase" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "600", display: "block", marginBottom: "0.35rem" }}>
+                  SUBJECT NAME *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Data Structures or Operating Systems"
+                  value={newSubName}
+                  onChange={(e) => setNewSubName(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", padding: "0.55rem 0.75rem", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "600", display: "block", marginBottom: "0.35rem" }}>
+                    DEPARTMENT
+                  </label>
+                  <select
+                    value={newSubDept}
+                    onChange={(e) => setNewSubDept(e.target.value)}
+                    className="premium-input"
+                    style={{ width: "100%", padding: "0.55rem 0.75rem", fontSize: "0.85rem" }}
+                  >
+                    {departments.length > 0 ? (
+                      departments.map((d) => (
+                        <option key={d.code} value={d.code}>
+                          {d.code}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="CSE">CSE</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "600", display: "block", marginBottom: "0.35rem" }}>
+                    SEMESTER
+                  </label>
+                  <select
+                    value={newSubSem}
+                    onChange={(e) => setNewSubSem(e.target.value)}
+                    className="premium-input"
+                    style={{ width: "100%", padding: "0.55rem 0.75rem", fontSize: "0.85rem" }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                      <option key={s} value={s}>
+                        Semester {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "600", display: "block", marginBottom: "0.35rem" }}>
+                  CREDITS
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={newSubCredits}
+                  onChange={(e) => setNewSubCredits(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", padding: "0.55rem 0.75rem", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddSubjectModal(false)}
+                  style={{
+                    padding: "0.55rem 1rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border-subtle)",
+                    backgroundColor: "transparent",
+                    color: "var(--text-muted)",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingSubject}
+                  style={{
+                    padding: "0.55rem 1.25rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    backgroundColor: "var(--royal-blue)",
+                    color: "#fff",
+                    fontSize: "0.85rem",
+                    fontWeight: "700",
+                    cursor: creatingSubject ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {creatingSubject ? "Adding..." : "Add to Catalog"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

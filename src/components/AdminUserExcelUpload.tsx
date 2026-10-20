@@ -281,17 +281,17 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
 
         const normalizeHeader = (value: unknown) => String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const columnAliases: Record<string, string[]> = {
-          subject1: ["subject1", "subjectone"],
-          subject2: ["subject2", "subjecttwo"],
-          lab1: ["lab1", "laboratory1"],
-          additional1: ["additional1"],
-          additional2: ["additional2"],
+          subject1: ["subject1", "subjectone", "sub1", "subone", "subject 1", "sub 1"],
+          subject2: ["subject2", "subjecttwo", "sub2", "subtwo", "subject 2", "sub 2"],
+          lab1: ["lab1", "laboratory1", "labone", "lab 1", "laboratory 1"],
+          additional1: ["additional1", "add1", "addone", "additional 1", "add 1"],
+          additional2: ["additional2", "add2", "addtwo", "additional 2", "add 2"],
         };
         const sourceHeaders = Object.keys(rawJson[0] || {});
         const subjectColumnsPresent = Object.fromEntries(
           Object.entries(columnAliases).map(([field, aliases]) => [
             field,
-            sourceHeaders.some((header) => aliases.includes(normalizeHeader(header))),
+            sourceHeaders.some((header) => aliases.some(a => normalizeHeader(a) === normalizeHeader(header))),
           ])
         );
         const getCell = (row: any, aliases: string[]) => {
@@ -794,6 +794,15 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
                   <th style={{ padding: "0.5rem 0.6rem" }}>Dept</th>
                   {selectedMode === "STUDENT" && <th style={{ padding: "0.5rem 0.6rem" }}>Sem / Sec</th>}
                   {(selectedMode === "FACULTY" || selectedMode === "HOD") && <th style={{ padding: "0.5rem 0.6rem" }}>Designation</th>}
+                  {(selectedMode === "FACULTY" || selectedMode === "ALL") && (
+                    <>
+                      <th style={{ padding: "0.5rem 0.6rem" }}>Subject 1</th>
+                      <th style={{ padding: "0.5rem 0.6rem" }}>Subject 2</th>
+                      <th style={{ padding: "0.5rem 0.6rem" }}>Lab 1</th>
+                      <th style={{ padding: "0.5rem 0.6rem" }}>Add 1</th>
+                      <th style={{ padding: "0.5rem 0.6rem" }}>Add 2</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -821,6 +830,15 @@ export default function AdminUserExcelUpload({ onUploadSuccess }: { onUploadSucc
                     )}
                     {(selectedMode === "FACULTY" || selectedMode === "HOD") && (
                       <td style={{ padding: "0.45rem 0.6rem" }}>{u.designation}</td>
+                    )}
+                    {(selectedMode === "FACULTY" || selectedMode === "ALL") && (
+                      <>
+                        <td style={{ padding: "0.45rem 0.6rem", fontSize: "0.75rem", color: u.subject1 ? "var(--text-main)" : "var(--text-muted)" }}>{u.subject1 || "—"}</td>
+                        <td style={{ padding: "0.45rem 0.6rem", fontSize: "0.75rem", color: u.subject2 ? "var(--text-main)" : "var(--text-muted)" }}>{u.subject2 || "—"}</td>
+                        <td style={{ padding: "0.45rem 0.6rem", fontSize: "0.75rem", color: u.lab1 ? "var(--text-main)" : "var(--text-muted)" }}>{u.lab1 || "—"}</td>
+                        <td style={{ padding: "0.45rem 0.6rem", fontSize: "0.75rem", color: u.additional1 ? "var(--text-main)" : "var(--text-muted)" }}>{u.additional1 || "—"}</td>
+                        <td style={{ padding: "0.45rem 0.6rem", fontSize: "0.75rem", color: u.additional2 ? "var(--text-main)" : "var(--text-muted)" }}>{u.additional2 || "—"}</td>
+                      </>
                     )}
                   </tr>
                 ))}
