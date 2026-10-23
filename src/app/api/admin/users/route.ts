@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { hashPassword } from "@/lib/encryption";
 import { requireAdmin } from "@/lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // GET /api/admin/users - Fetch all users with their profile relations from DB
 export async function GET() {
   try {

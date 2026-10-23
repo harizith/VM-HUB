@@ -391,32 +391,47 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const safeFetch = async (url: string) => {
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) {
+            console.warn(`[Admin Fetch] HTTP ${res.status} for ${url}`);
+            return { success: false, status: res.status };
+          }
+          return await res.json();
+        } catch (e: any) {
+          console.error(`[Admin Fetch Error] ${url}:`, e?.message || e);
+          return { success: false, error: e?.message };
+        }
+      };
+
       const [uRes, dRes, sRes, nRes, doRes, lRes, aRes] = await Promise.all([
-        fetch("/api/admin/users").then((r) => r.json()),
-        fetch("/api/admin/departments").then((r) => r.json()),
-        fetch("/api/admin/subjects").then((r) => r.json()),
-        fetch("/api/admin/notices").then((r) => r.json()),
-        fetch("/api/admin/day-order").then((r) => r.json()),
-        fetch("/api/admin/leaves").then((r) => r.json()),
-        fetch("/api/admin/audit-logs").then((r) => r.json()),
+        safeFetch("/api/admin/users"),
+        safeFetch("/api/admin/departments"),
+        safeFetch("/api/admin/subjects"),
+        safeFetch("/api/admin/notices"),
+        safeFetch("/api/admin/day-order"),
+        safeFetch("/api/admin/leaves"),
+        safeFetch("/api/admin/audit-logs"),
       ]);
 
-      if (uRes.success) setUsers(uRes.users);
-      if (dRes.success) setDepts(dRes.departments);
-      if (sRes.success) setSubjects(sRes.subjects);
-      if (nRes.success) setNotices(nRes.notices);
-      if (aRes.success && aRes.logs) setAuditLogs(aRes.logs);
-      if (doRes.success && doRes.data) setCurrentDayOrderIndex(doRes.data.baseIndex.toString());
-      if (lRes.success && lRes.data) {
+      if (uRes?.success && Array.isArray(uRes.users)) setUsers(uRes.users);
+      if (dRes?.success && Array.isArray(dRes.departments)) setDepts(dRes.departments);
+      if (sRes?.success && Array.isArray(sRes.subjects)) setSubjects(sRes.subjects);
+      if (nRes?.success && Array.isArray(nRes.notices)) setNotices(nRes.notices);
+      if (aRes?.success && Array.isArray(aRes.logs)) setAuditLogs(aRes.logs);
+      if (doRes?.success && doRes.data) setCurrentDayOrderIndex(doRes.data.baseIndex.toString());
+      if (lRes?.success && lRes.data) {
         setTodayStatus(lRes.data.today);
         setTomorrowStatus(lRes.data.tomorrow);
         setTodayDateStr(lRes.data.todayDate);
         setTomorrowDateStr(lRes.data.tomorrowDate);
       }
+
       // Fetch timetable options (available classes & faculty)
       try {
-        const ttOpt = await fetch("/api/admin/timetable?list=options").then((r) => r.json());
-        if (ttOpt.success && ttOpt.options) {
+        const ttOpt = await safeFetch("/api/admin/timetable?list=options");
+        if (ttOpt?.success && ttOpt.options) {
           setAvailableFaculty(ttOpt.options.faculty || []);
           if (ttOpt.options.faculty?.length > 0 && !selectedFaculty) {
             setSelectedFaculty(ttOpt.options.faculty[0].name);
