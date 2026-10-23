@@ -48,8 +48,15 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. Extract unique courses and classes
+    // 3. Extract unique courses and classes and calculate weekly periods from actual entries
     const uniqueCoursesMap = new Map();
+
+    // Count actual scheduled hours per course
+    const courseHoursMap = new Map<string, number>();
+    timetable.forEach(entry => {
+      const key = `${entry.subjectCode}-${entry.classId}`;
+      courseHoursMap.set(key, (courseHoursMap.get(key) || 0) + 1);
+    });
 
     timetable.forEach(entry => {
       // Create a unique key for each Subject + Class combination
@@ -57,15 +64,14 @@ export async function GET(request: Request) {
       if (!uniqueCoursesMap.has(key)) {
         uniqueCoursesMap.set(key, {
           id: key,
-          name: entry.subjectName,
+          name: entry.subjectName || entry.subjectCode,
           code: entry.subjectCode,
           class: entry.classId,
-          // Generate a deterministic color based on the subject code
           color: "rgba(56, 189, 248, 0.1)", 
           iconColor: "var(--sky-blue)",
-          students: Math.floor(Math.random() * 20) + 40, // Simulated student count since we don't have enrollment tables
-          progress: Math.floor(Math.random() * 40) + 30, // Simulated syllabus progress
-          nextClass: "Pending Scheduling" // Could be calculated by finding the next chronological period
+          weeklyHours: courseHoursMap.get(key) || 0,
+          roomNo: entry.roomNo || "Assigned Lecture Hall",
+          nextClass: "Scheduled in Timetable"
         });
       }
     });

@@ -379,44 +379,16 @@ export async function POST(request: Request) {
     const solved = solveSlot(0);
 
     if (!solved) {
-      // Fallback: If strict 6-period max cannot satisfy all 40 slots with small pool size,
-      // allow relaxation of max periods limit proportionally while strictly enforcing:
-      // - No 2 consecutive non-lab periods
-      // - Balanced distribution
-      console.warn('Strict rule solve did not cover all slots; applying proportional relaxation...');
-      for (const slot of missingSlots) {
-        const { day, period } = slot;
-        if (grid[day][period]?.subjectCode) continue;
-
-        const sortedCandidates = [...subjectPool].sort((a, b) => {
-          const aCount = subjectWeeklyCounts.get(a.code) || 0;
-          const bCount = subjectWeeklyCounts.get(b.code) || 0;
-          return aCount - bCount;
-        });
-
-        for (const candidate of sortedCandidates) {
-          const prevEntry = period > 1 ? grid[day][period - 1] : null;
-          const isConsecutive =
-            prevEntry && (prevEntry.subjectCode?.toUpperCase() === candidate.code || prevEntry.subjectName?.toLowerCase() === candidate.name.toLowerCase());
-
-          if (!candidate.isLab && isConsecutive) continue;
-
-          grid[day][period] = {
-            classId,
-            dayOrder: day,
-            period,
-            timeRange: DEFAULT_TIME_RANGES[period] || `Period ${period}`,
-            subjectCode: candidate.code,
-            subjectName: candidate.name,
-            facultyName: candidate.facultyName,
-            roomNo: candidate.roomNo,
-            vmsNo: candidate.vmsNo,
-            category: candidate.category,
-          };
-          subjectWeeklyCounts.set(candidate.code, (subjectWeeklyCounts.get(candidate.code) || 0) + 1);
-          break;
-        }
-      }
+      // If the strict constraint solver cannot schedule all periods with the current subjects without
+      // violating the user's rules (max 6 periods, no consecutive theory/lecture periods, at least 1 period per day),
+      // we must NOT relax the rules or invent invalid schedules. Instead, report a clear error explaining the constraint deficit.
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot generate timetable for ${classId} without violating rules: each subject is limited to a maximum of 6 periods, non-lab subjects cannot have consecutive periods, and each day must be scheduled. Current Course Catalog pool has only ${subjectPool.length} subjects for this semester (need at least ${Math.ceil(missingSlots.length / 6)} subjects to satisfy 40 periods). Please add more subjects to the Course Catalog.`,
+        },
+        { status: 400 }
+      );
     }
 
     // Collect newly generated additions from solved grid
