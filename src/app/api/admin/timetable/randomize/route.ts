@@ -78,7 +78,7 @@ interface SubjectCandidate {
   roomNo: string | null;
 }
 
-// Check if a category or subject name/code represents a laboratory course
+// Check if a category or subject name/code represents a laboratory or double-period block (Lab, PPT, Seminar, Project)
 function isLabCourse(name?: string | null, code?: string | null, category?: string | null): boolean {
   const text = `${name || ''} ${code || ''} ${category || ''}`.toLowerCase();
   return (
@@ -86,7 +86,11 @@ function isLabCourse(name?: string | null, code?: string | null, category?: stri
     text.includes('practical') ||
     text.includes('laboratory') ||
     text.includes('workshop') ||
-    text.includes('project')
+    text.includes('project') ||
+    text.includes('ppt') ||
+    text.includes('seminar') ||
+    text.includes('presentation') ||
+    text.includes('training')
   );
 }
 
