@@ -9,28 +9,32 @@ const apiKeys = [
   process.env.FALLBACK_GROQ_API_KEY_2
 ].filter(Boolean) as string[];
 
+// High-efficiency model ladder for Groq Free Tier:
+// llama-3.1-8b-instant has 30,000 TPM / 30 RPM (5x higher limit than 70b models)
+const MODELS_TO_TRY = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'mixtral-8x7b-32768',
+];
+
+// Short in-memory cache for frequent read queries to prevent redundant Groq calls
+const queryCache = new Map<string, { reply: string; timestamp: number }>();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 async function createCompletionWithFailover(messages: any[], tools?: any[]) {
   let lastError: any;
   for (const apiKey of apiKeys) {
     try {
       const groqClient = new Groq({ apiKey });
-      // Optimized model ladder: prioritize lightweight, low-token instant models
-      // llama-3.1-8b-instant has 30,000 TPM and 30 RPM on Groq's free tier (5x higher limit than 70b)
-      const modelsToTry = [
-        'llama-3.1-8b-instant',
-        'llama-3.3-70b-versatile',
-        'mixtral-8x7b-32768',
-        'openai/gpt-oss-120b',
-      ];
       
       let clientError: any;
-      for (const model of modelsToTry) {
+      for (const model of MODELS_TO_TRY) {
         try {
           const options: any = {
             messages,
             model,
-            max_tokens: 500, // keep token usage minimal so it never exhausts rate limits
-            temperature: 0.2, // low temperature for faster, deterministic, token-efficient queries
+            max_tokens: 350, // optimal concise output length to conserve TPM/limit
+            temperature: 0.1, // low temperature: deterministic, concise, token-efficient
           };
           if (tools) {
             options.tools = tools;
@@ -41,11 +45,9 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
           clientError = modelErr;
           const msg = modelErr?.message || String(modelErr);
           if (msg.includes('model') || msg.includes('decommissioned') || msg.includes('not found')) {
-            console.warn(`Model ${model} unavailable, trying next model...`);
             continue;
           }
           if (msg.includes('rate_limit') || msg.includes('tokens per minute') || modelErr?.status === 429) {
-            console.warn(`Model ${model} hit token/rate limit, falling back to next model...`);
             continue;
           }
           throw modelErr;
@@ -56,7 +58,6 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
       const errStr = error?.message || String(error);
       if (errStr.includes('rate_limit') || errStr.includes('tokens per minute') || error?.status === 429 || error?.status === 413) {
         lastError = error;
-        console.warn(`Groq API Key ending in ${apiKey.slice(-4)} failed due to rate limits. Trying next...`);
         continue;
       }
       throw error;
@@ -65,185 +66,136 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
   throw lastError || new Error("All Groq API keys hit rate limits or none were provided. Please add FALLBACK_GROQ_API_KEY to your .env");
 }
 
-const schemaStr = `
-model User {
-  id        String   @id @default(uuid())
-  vmNo      String?  @unique
-  email     String   @unique
-  name      String
-  role      String   @default("STUDENT") // STUDENT, FACULTY, HOD, ADMIN
-  status    String   @default("ACTIVE")
-}
-model StudentProfile {
-  userEmail   String   @id
-  rollNumber  String   @unique
-  department  String
-  semester    Int      @default(1)
-  batch       String   @default("2023-2027")
-}
-model FacultyProfile {
-  vmNo        String   @id
-  department  String
-  designation String   @default("Assistant Professor")
-}
-model Department {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
-  hodName   String?  
-}
-model Subject {
-  id             String   @id @default(uuid())
-  code           String   @unique
-  name           String
-  credits        Int      @default(3)
-  semester       Int      @default(5)
-  departmentCode String   @default("CSE")
-}
-model Notice {
-  id        String   @id @default(uuid())
-  title     String
-  content   String
-  category  String   @default("GENERAL")
-  postedBy  String   @default("Admin")
-}
-model TimetableEntry {
-  id          String   @id @default(uuid())
-  classId     String
-  dayOrder    String
-  period      Int
-  timeRange   String
-  subjectCode String
-  subjectName String
-  facultyName String
-  roomNo      String
-}
-`;
-
 // Disallow dangerous SQL commands in AI queries
 const DESTRUCTIVE_SQL_PATTERN = /\b(DROP|TRUNCATE|ALTER|GRANT|REVOKE|DATABASE|SCHEMA|SHUTDOWN)\b/i;
+
+// Ultra-compact system prompt minimizing input tokens
+const SYSTEM_PROMPT = `Admin assistant for VM-HUB academic portal.
+Models:
+- User(id,vmNo,email,name,role[STUDENT,FACULTY,HOD,ADMIN],status)
+- StudentProfile(userEmail,rollNumber,department,semester,batch)
+- FacultyProfile(vmNo,department,designation)
+- Department(id,code,name,hodName)
+- Subject(id,code,name,credits,semester,departmentCode)
+- Notice(id,title,content,category,audience,postedBy)
+- TimetableEntry(id,classId,dayOrder,period,timeRange,subjectCode,subjectName,facultyName,roomNo)
+
+Rules:
+1. Concise & direct responses (max 2-3 sentences or bullet points).
+2. Use read_query for SELECT queries. Never access passwords.
+3. Passwords are safe bcrypt hashes; offer to reset instead.`;
+
+const TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'read_query',
+      description: 'Execute read-only SELECT SQL query.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sqlQuery: { type: 'string', description: 'SELECT query.' }
+        },
+        required: ['sqlQuery']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_user',
+      description: 'Create user with bcrypt password.',
+      parameters: {
+        type: 'object',
+        properties: {
+          email: { type: 'string' },
+          name: { type: 'string' },
+          password: { type: 'string' },
+          role: { type: 'string', enum: ['STUDENT', 'FACULTY', 'HOD', 'ADMIN'] },
+          vmNo: { type: 'string' }
+        },
+        required: ['email', 'name', 'password', 'role']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_user_password',
+      description: 'Reset user password with bcrypt.',
+      parameters: {
+        type: 'object',
+        properties: {
+          email: { type: 'string' },
+          newPassword: { type: 'string' }
+        },
+        required: ['email', 'newPassword']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_notice',
+      description: 'Publish academic notice.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          content: { type: 'string' },
+          category: { type: 'string', enum: ['GENERAL', 'URGENT', 'EXAM'] },
+          audience: { type: 'string', enum: ['ALL', 'STUDENT', 'FACULTY'] }
+        },
+        required: ['title', 'content']
+      }
+    }
+  }
+];
 
 export async function POST(request: Request) {
   try {
     const { query, attachedData, history } = await request.json();
     
-    if (!query) {
+    if (!query || typeof query !== 'string') {
       return NextResponse.json({ success: false, reply: 'No query provided.' }, { status: 400 });
     }
 
-    let systemContent = `You are the friendly administrative copilot for the VM-HUB Academic Portal.
-Help admins inspect database records, manage users, and view academic schedules.
-Database models available:
-- User (id, vmNo, email, name, role [STUDENT, FACULTY, HOD, ADMIN], status)
-- StudentProfile (userEmail, rollNumber, department, semester, batch)
-- FacultyProfile (vmNo, department, designation)
-- Department (id, code, name, hodName)
-- Subject (id, code, name, credits, semester, departmentCode)
-- Notice (id, title, content, category, audience, postedBy)
-- TimetableEntry (id, classId, dayOrder, period, timeRange, subjectCode, subjectName, facultyName, roomNo)
+    const trimmedQuery = query.trim();
+    const cacheKey = trimmedQuery.toLowerCase();
 
-Rules:
-1. Always be concise, polite, and direct to keep token limits low.
-2. Use 'read_query' for read queries (SELECT only).
-3. Use 'create_user' / 'update_user_password' for user creation and password resets.
-4. If asked about a user's password, politely explain it is safely stored as a one-way bcrypt hash, and offer to reset it.`;
-
-    if (attachedData) {
-      systemContent += `\nAttached data:\n${JSON.stringify(attachedData).substring(0, 400)}`;
+    // Check fast cache for identical queries within TTL (saves 100% of tokens on repeated questions)
+    if (!attachedData && (!history || history.length === 0)) {
+      const cached = queryCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+        return NextResponse.json({ success: true, reply: cached.reply, cached: true });
+      }
     }
 
-    // Keep only last 3 history messages trimmed to 400 chars to avoid exceeding token per minute limits
-    const recentHistory = (history || []).slice(-3).map((msg: any) => {
-      if (typeof msg.content === 'string' && msg.content.length > 400) {
-        return { ...msg, content: msg.content.substring(0, 400) + '...' };
-      }
-      return msg;
-    });
+    let dynamicSystem = SYSTEM_PROMPT;
+    if (attachedData) {
+      // Limit attached data preview to 200 chars to prevent token spikes
+      dynamicSystem += `\nData: ${JSON.stringify(attachedData).substring(0, 200)}`;
+    }
+
+    // Keep only the last 2 conversation turns, compacting strings to max 200 chars
+    const recentHistory = (history || []).slice(-2).map((msg: any) => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof msg.content === 'string' && msg.content.length > 200 
+        ? msg.content.substring(0, 200) + '...' 
+        : (msg.content || '')
+    }));
 
     const messages: any[] = [
-      {
-        role: 'system',
-        content: systemContent
-      },
+      { role: 'system', content: dynamicSystem },
       ...recentHistory,
-      {
-        role: 'user',
-        content: typeof query === 'string' && query.length > 600 ? query.substring(0, 600) : query
-      }
+      { role: 'user', content: trimmedQuery.substring(0, 300) }
     ];
 
-    const tools = [
-      {
-        type: 'function',
-        function: {
-          name: 'read_query',
-          description: 'Executes a safe, read-only SELECT query against the PostgreSQL database. Passwords cannot be queried.',
-          parameters: {
-            type: 'object',
-            properties: {
-              sqlQuery: { type: 'string', description: 'The read-only SELECT query to execute.' }
-            },
-            required: ['sqlQuery']
-          }
-        }
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'create_user',
-          description: 'Creates a new user safely using salted bcrypt password hashing.',
-          parameters: {
-            type: 'object',
-            properties: {
-              email: { type: 'string' },
-              name: { type: 'string' },
-              password: { type: 'string' },
-              role: { type: 'string', enum: ['STUDENT', 'FACULTY', 'HOD', 'ADMIN'] },
-              vmNo: { type: 'string', description: 'Roll number or VM identifier' }
-            },
-            required: ['email', 'name', 'password', 'role']
-          }
-        }
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'update_user_password',
-          description: 'Securely resets a user password using salted bcrypt hashing.',
-          parameters: {
-            type: 'object',
-            properties: {
-              email: { type: 'string' },
-              newPassword: { type: 'string' }
-            },
-            required: ['email', 'newPassword']
-          }
-        }
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'create_notice',
-          description: 'Publishes a new official academic notice.',
-          parameters: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              content: { type: 'string' },
-              category: { type: 'string', enum: ['GENERAL', 'URGENT', 'EXAM'] },
-              audience: { type: 'string', enum: ['ALL', 'STUDENT', 'FACULTY'] }
-            },
-            required: ['title', 'content']
-          }
-        }
-      }
-    ];
-
-    let currentCompletion = await createCompletionWithFailover(messages, tools);
+    let currentCompletion = await createCompletionWithFailover(messages, TOOLS);
     let currentMessage = currentCompletion.choices[0]?.message;
 
     let iterations = 0;
-    const MAX_ITERATIONS = 4;
+    const MAX_ITERATIONS = 2; // Reduced to 2 iterations max to prevent runaway token expenditure
 
     while (currentMessage?.tool_calls?.length && iterations < MAX_ITERATIONS) {
       const toolCall = currentMessage.tool_calls[0];
@@ -257,17 +209,17 @@ Rules:
         
         // Security checks: enforce read-only SELECT queries and block destructive keywords
         if (!trimmed.toLowerCase().startsWith('select') && !trimmed.toLowerCase().startsWith('with')) {
-          dbResult = 'Security Error: Only read-only SELECT queries are permitted via read_query.';
+          dbResult = 'Error: Only SELECT queries permitted.';
         } else if (DESTRUCTIVE_SQL_PATTERN.test(trimmed)) {
-          dbResult = 'Security Error: Destructive SQL keywords are strictly forbidden.';
+          dbResult = 'Error: Destructive SQL forbidden.';
         } else if (/password/i.test(trimmed)) {
-          dbResult = 'Security Error: Access to password hashes is restricted.';
+          dbResult = 'Error: Access to password hashes restricted.';
         } else {
           try {
             dbResult = await prisma.$queryRawUnsafe(sqlQuery);
           } catch (err: any) {
             errorStr = err.message;
-            dbResult = `Database error: ${errorStr}`;
+            dbResult = `DB error: ${errorStr}`;
           }
         }
       } else if (toolName === 'create_user') {
@@ -297,10 +249,10 @@ Rules:
             }).catch(() => null);
           }
 
-          dbResult = `[User created successfully. ID: ${newUser.id}]`;
+          dbResult = `User ${newUser.id} created.`;
         } catch (err: any) {
           errorStr = err.message;
-          dbResult = `Failed to create user: ${errorStr}`;
+          dbResult = `Error: ${errorStr}`;
         }
       } else if (toolName === 'update_user_password') {
         const { email, newPassword } = JSON.parse(toolCall.function.arguments);
@@ -321,10 +273,10 @@ Rules:
             }).catch(() => null);
           }
 
-          dbResult = `[Password reset successfully for ${cleanEmail} with salted bcrypt]`;
+          dbResult = `Password reset for ${cleanEmail}.`;
         } catch (err: any) {
           errorStr = err.message;
-          dbResult = `Failed to update password: ${errorStr}`;
+          dbResult = `Error: ${errorStr}`;
         }
       } else if (toolName === 'create_notice') {
         const { title, content, category, audience } = JSON.parse(toolCall.function.arguments);
@@ -338,10 +290,10 @@ Rules:
               postedBy: "Admin"
             }
           });
-          dbResult = `[Notice published successfully. ID: ${notice.id}]`;
+          dbResult = `Notice ${notice.id} created.`;
         } catch (err: any) {
           errorStr = err.message;
-          dbResult = `Failed to create notice: ${errorStr}`;
+          dbResult = `Error: ${errorStr}`;
         }
       } else {
         dbResult = `Unknown tool: ${toolName}`;
@@ -349,9 +301,10 @@ Rules:
 
       messages.push(currentMessage);
       
+      // Limit DB result output fed back to Groq to 600 characters (down from 2000)
       let resultString = typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult);
-      if (resultString.length > 2000) {
-        resultString = resultString.substring(0, 2000) + '... [Results Truncated]';
+      if (resultString.length > 600) {
+        resultString = resultString.substring(0, 600) + '... [truncated]';
       }
 
       messages.push({
@@ -361,14 +314,27 @@ Rules:
         content: resultString
       });
 
-      currentCompletion = await createCompletionWithFailover(messages, tools);
+      // No tools in the follow-up completion: forces immediate concise answer with zero extra tool tokens
+      currentCompletion = await createCompletionWithFailover(messages);
       currentMessage = currentCompletion.choices[0]?.message;
       iterations++;
     }
 
+    const reply = currentMessage?.content || "Request processed.";
+
+    // Store in cache for TTL
+    if (!attachedData) {
+      queryCache.set(cacheKey, { reply, timestamp: Date.now() });
+      if (queryCache.size > 100) {
+        // Prune older entries
+        const firstKey = queryCache.keys().next().value;
+        if (firstKey) queryCache.delete(firstKey);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      reply: currentMessage?.content || "I processed your request."
+      reply
     });
 
   } catch (error: any) {
@@ -376,8 +342,8 @@ Rules:
     const errText = error?.message || String(error);
     const isRateLimit = errText.includes('rate limit') || errText.includes('429') || errText.includes('tokens per minute');
     const userFriendlyMessage = isRateLimit
-      ? "I am currently experiencing high demand and briefly hit the free AI token rate limit. Please wait 10-20 seconds and ask again, or add a secondary fallback Groq API key in your portal settings."
-      : `I encountered an issue processing that: ${errText}. Please try rephrasing your request.`;
+      ? "AI token limit reached briefly on the free tier. Please wait 15 seconds, or configure a fallback key in your .env."
+      : `Unable to process request: ${errText}`;
 
     return NextResponse.json({ success: false, reply: userFriendlyMessage }, { status: 200 });
   }

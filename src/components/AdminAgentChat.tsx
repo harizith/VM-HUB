@@ -65,14 +65,15 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
       const payload: any = { 
         query: userMessage,
         history: messages
-          .filter(m => !m.content.startsWith("(Attached"))
+          .filter(m => !m.content.startsWith("(Attached") && !m.content.startsWith("Hello! I am your"))
+          .slice(-2)
           .map(m => ({
             role: m.role === "agent" ? "assistant" : "user",
-            content: m.content
+            content: m.content.length > 200 ? m.content.substring(0, 200) : m.content
           }))
       };
       if (attachedData) {
-        payload.attachedData = attachedData;
+        payload.attachedData = attachedData.slice(0, 5); // only send first 5 sample rows to prevent token floods
       }
 
       const res = await fetch("/api/admin/agent", {
