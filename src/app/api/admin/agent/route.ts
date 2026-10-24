@@ -14,11 +14,13 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
   for (const apiKey of apiKeys) {
     try {
       const groqClient = new Groq({ apiKey });
+      // Optimized model ladder: prioritize lightweight, low-token instant models
+      // llama-3.1-8b-instant has 30,000 TPM and 30 RPM on Groq's free tier (5x higher limit than 70b)
       const modelsToTry = [
-        'llama-3.3-70b-versatile',
         'llama-3.1-8b-instant',
+        'llama-3.3-70b-versatile',
+        'mixtral-8x7b-32768',
         'openai/gpt-oss-120b',
-        'mixtral-8x7b-32768'
       ];
       
       let clientError: any;
@@ -27,6 +29,8 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
           const options: any = {
             messages,
             model,
+            max_tokens: 500, // keep token usage minimal so it never exhausts rate limits
+            temperature: 0.2, // low temperature for faster, deterministic, token-efficient queries
           };
           if (tools) {
             options.tools = tools;
@@ -38,6 +42,10 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
           const msg = modelErr?.message || String(modelErr);
           if (msg.includes('model') || msg.includes('decommissioned') || msg.includes('not found')) {
             console.warn(`Model ${model} unavailable, trying next model...`);
+            continue;
+          }
+          if (msg.includes('rate_limit') || msg.includes('tokens per minute') || modelErr?.status === 429) {
+            console.warn(`Model ${model} hit token/rate limit, falling back to next model...`);
             continue;
           }
           throw modelErr;
@@ -123,25 +131,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, reply: 'No query provided.' }, { status: 400 });
     }
 
-    let systemContent = `You are a trusted administrative copilot for the VM-HUB Academic Portal.
-You have the ability to inspect database records safely using read queries and execute controlled data management tools.
-Here is the application database schema:
+    let systemContent = `You are the friendly administrative copilot for the VM-HUB Academic Portal.
+Help admins inspect database records, manage users, and view academic schedules.
+Database models available:
+- User (id, vmNo, email, name, role [STUDENT, FACULTY, HOD, ADMIN], status)
+- StudentProfile (userEmail, rollNumber, department, semester, batch)
+- FacultyProfile (vmNo, department, designation)
+- Department (id, code, name, hodName)
+- Subject (id, code, name, credits, semester, departmentCode)
+- Notice (id, title, content, category, audience, postedBy)
+- TimetableEntry (id, classId, dayOrder, period, timeRange, subjectCode, subjectName, facultyName, roomNo)
 
-${schemaStr}
-
-Security & Architecture Rules:
-1. Passwords are cryptographic one-way salted hashes (bcrypt). They CANNOT be decrypted or viewed by anyone. If a user forgot their password, offer to reset it with a new secure password using 'update_user_password'.
-2. Never execute destructive DDL statements (DROP, TRUNCATE, ALTER). Read queries must use 'read_query'.
-3. To create users or reset passwords, always use the dedicated parameterized tools ('create_user', 'update_user_password').
-4. Be helpful, professional, and clear. Explain data insights concisely without dumping raw unformatted JSON.`;
+Rules:
+1. Always be concise, polite, and direct to keep token limits low.
+2. Use 'read_query' for read queries (SELECT only).
+3. Use 'create_user' / 'update_user_password' for user creation and password resets.
+4. If asked about a user's password, politely explain it is safely stored as a one-way bcrypt hash, and offer to reset it.`;
 
     if (attachedData) {
-      systemContent += `\n\nAdditionally, the user has attached data for analysis or processing:\n${JSON.stringify(attachedData).substring(0, 1000)}`;
+      systemContent += `\nAttached data:\n${JSON.stringify(attachedData).substring(0, 400)}`;
     }
 
-    const recentHistory = (history || []).slice(-4).map((msg: any) => {
-      if (typeof msg.content === 'string' && msg.content.length > 1500) {
-        return { ...msg, content: msg.content.substring(0, 1500) + '... [Truncated]' };
+    // Keep only last 3 history messages trimmed to 400 chars to avoid exceeding token per minute limits
+    const recentHistory = (history || []).slice(-3).map((msg: any) => {
+      if (typeof msg.content === 'string' && msg.content.length > 400) {
+        return { ...msg, content: msg.content.substring(0, 400) + '...' };
       }
       return msg;
     });
@@ -154,7 +168,7 @@ Security & Architecture Rules:
       ...recentHistory,
       {
         role: 'user',
-        content: query
+        content: typeof query === 'string' && query.length > 600 ? query.substring(0, 600) : query
       }
     ];
 
@@ -359,6 +373,12 @@ Security & Architecture Rules:
 
   } catch (error: any) {
     console.error('Agent error:', error);
-    return NextResponse.json({ success: false, reply: `An error occurred: ${error?.message || String(error)}` }, { status: 500 });
+    const errText = error?.message || String(error);
+    const isRateLimit = errText.includes('rate limit') || errText.includes('429') || errText.includes('tokens per minute');
+    const userFriendlyMessage = isRateLimit
+      ? "I am currently experiencing high demand and briefly hit the free AI token rate limit. Please wait 10-20 seconds and ask again, or add a secondary fallback Groq API key in your portal settings."
+      : `I encountered an issue processing that: ${errText}. Please try rephrasing your request.`;
+
+    return NextResponse.json({ success: false, reply: userFriendlyMessage }, { status: 200 });
   }
 }

@@ -149,7 +149,7 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
     }}>
       {/* Header */}
       <div style={{
-        padding: "1rem",
+        padding: "0.85rem 1rem",
         backgroundColor: "var(--royal-blue)",
         color: "white",
         display: "flex",
@@ -158,7 +158,8 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: "600" }}>
           <Database size={18} />
-          Local DB Agent
+          <span>Academic Copilot</span>
+          <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem", borderRadius: "4px", backgroundColor: "rgba(255,255,255,0.2)", fontWeight: "500" }}>Fast & Efficient</span>
         </div>
         <button 
           onClick={() => setIsOpen(false)}
@@ -166,6 +167,36 @@ export default function AdminAgentChat({ onTimetableUpdated }: { onTimetableUpda
         >
           <X size={20} />
         </button>
+      </div>
+
+      {/* Quick Suggestion Chips */}
+      <div style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--bg-input)", borderBottom: "1px solid var(--border-subtle)", display: "flex", gap: "0.4rem", overflowX: "auto" }}>
+        {[
+          "List all departments",
+          "Show recent notices",
+          "Count students",
+          "Reset user password"
+        ].map((prompt, idx) => (
+          <button
+            key={idx}
+            onClick={() => setInput(prompt)}
+            style={{
+              padding: "0.25rem 0.6rem",
+              borderRadius: "12px",
+              border: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-card)",
+              color: "var(--text-muted)",
+              fontSize: "0.72rem",
+              whiteSpace: "nowrap",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = "var(--sky-blue)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}
+          >
+            {prompt}
+          </button>
+        ))}
       </div>
 
       {/* Messages */}
