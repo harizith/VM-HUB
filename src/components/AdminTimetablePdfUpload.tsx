@@ -58,14 +58,20 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [fileType, setFileType] = useState<"pdf" | "doc" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFile: File) => {
-    if (!selectedFile.name.toLowerCase().endsWith(".pdf")) {
-      setErrorMessage("Please upload a valid PDF document (.pdf)");
+    const name = selectedFile.name.toLowerCase();
+    const isPdf = name.endsWith(".pdf");
+    const isDoc = name.endsWith(".docx") || name.endsWith(".doc");
+
+    if (!isPdf && !isDoc) {
+      setErrorMessage("Please upload a valid PDF document (.pdf) or Word document (.docx/.doc)");
       return;
     }
     setFile(selectedFile);
+    setFileType(isPdf ? "pdf" : "doc");
     setErrorMessage(null);
     setUploadResult(null);
   };
@@ -99,7 +105,8 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
     formData.append("mode", importMode);
 
     try {
-      const res = await fetch("/api/admin/timetable/import-pdf", {
+      const endpoint = fileType === "doc" ? "/api/admin/timetable/import-doc" : "/api/admin/timetable/import-pdf";
+      const res = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
@@ -110,14 +117,14 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
         setUploadResult({
           success: true,
           count: data.count,
-          facultyCount: data.facultyCount,
+          facultyCount: data.facultyCount || data.faculty?.length || 0,
           faculties: data.faculties,
           sampleSlots: data.sampleSlots,
-          message: data.message || `Imported ${data.count} timetable rows from the PDF.`,
+          message: data.message || `Imported ${data.count} timetable rows successfully.`,
         });
         if (onUploadSuccess) onUploadSuccess();
       } else {
-        setErrorMessage(data.error || "Failed to parse and import timetable PDF.");
+        setErrorMessage(data.error || "Failed to parse and import timetable file.");
       }
     } catch (err: any) {
       setErrorMessage(err.message || "An unexpected network error occurred.");
@@ -128,6 +135,7 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
 
   const handleReset = () => {
     setFile(null);
+    setFileType(null);
     setUploadResult(null);
     setErrorMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -151,18 +159,40 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
                 alignItems: "center",
                 gap: "0.3rem"
               }}>
-                <Sparkles size={12} /> AUTOMATED PDF TIMETABLE EXTRACTION
+                <Sparkles size={12} /> AUTOMATED PDF & WORD TIMETABLE EXTRACTION
               </span>
             </div>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "800", margin: 0, color: "var(--text-main)" }}>
-              Upload Individual Faculty Timetables (.pdf)
+              Upload Official Timetables (.pdf, .docx, .doc)
             </h2>
             <p style={{ margin: "0.4rem 0 0 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
-              Imports only rows and values that can be read from a text-based timetable table. Unreadable or scanned PDFs are rejected instead of being filled with generated timetable data.
+              Upload official PDF or Word documents formatted in the standard period timetable matrix. Blank cells stay blank; unreadable files are rejected without hallucinating fake data.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <a
+              href="/api/admin/timetable/template-doc"
+              download="timetable-import-template.docx"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                textDecoration: "none",
+                cursor: "pointer"
+              }}
+            >
+              <Download size={14} color="#2563eb" /> Word Template (.docx)
+            </a>
             <a
               href="/api/admin/timetable/template-pdf?type=individual"
               download="individual-faculty-timetable-template.pdf"
@@ -223,7 +253,7 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
                 cursor: "pointer"
               }}
             >
-              <Info size={14} /> {showGuide ? "Hide PDF Guide" : "View PDF Guide"}
+              <Info size={14} /> {showGuide ? "Hide Guide" : "View Guide"}
             </button>
           </div>
         </div>
@@ -292,7 +322,7 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
             type="file"
             ref={fileInputRef}
             onChange={(e) => e.target.files && e.target.files[0] && handleFileSelect(e.target.files[0])}
-            accept=".pdf,application/pdf"
+            accept=".pdf, .docx, .doc, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
             style={{ display: "none" }}
           />
 
@@ -312,12 +342,12 @@ export default function AdminTimetablePdfUpload({ onUploadSuccess }: { onUploadS
 
           <div>
             <h3 style={{ fontSize: "1.15rem", fontWeight: "700", margin: "0 0 0.3rem 0", color: "var(--text-main)" }}>
-              {file ? file.name : "Choose or drag & drop Timetable PDF"}
+              {file ? file.name : "Choose or drag & drop Timetable PDF or Word Document"}
             </h3>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
               {file
                 ? `${(file.size / (1024 * 1024)).toFixed(2)} MB • Ready for automated extraction`
-                : "Text-readable timetable PDF with a row-oriented table"}
+                : "Official period matrix timetable in PDF (.pdf) or Word (.docx, .doc)"}
             </p>
           </div>
         </div>

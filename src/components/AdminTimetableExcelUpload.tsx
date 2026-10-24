@@ -93,11 +93,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
     }
   ];
 
-  const handleDownloadTemplate = (format: "xlsx" | "csv" | "docx") => {
-    if (format === "docx") {
-      window.open("/api/admin/timetable/template-doc", "_blank");
-      return;
-    }
+  const handleDownloadTemplate = (format: "xlsx" | "csv") => {
     const ws = XLSX.utils.json_to_sheet(SAMPLE_ROWS);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Timetable_Template");
@@ -268,36 +264,18 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
               <span style={{ backgroundColor: "rgba(56, 189, 248, 0.15)", color: "var(--sky-blue)", padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.75rem", fontWeight: "700" }}>
-                DOCUMENT & SPREADSHEET TIMETABLE IMPORT
+                EXCEL SPREADSHEET TIMETABLE IMPORT
               </span>
             </div>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "800", margin: 0, color: "var(--text-main)" }}>
-              Upload Timetables (.docx, .doc, .xlsx, .csv)
+              Upload Timetables (.xlsx, .xls, .csv)
             </h2>
             <p style={{ margin: "0.4rem 0 0 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
-              Upload official Word documents or Excel spreadsheets. Blank cells stay blank; only non-empty rows are imported.
+              Upload official Excel spreadsheets or CSV files. Blank cells stay blank; only non-empty rows are imported.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              onClick={() => handleDownloadTemplate("docx")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                padding: "0.55rem 1rem",
-                borderRadius: "8px",
-                backgroundColor: "var(--bg-input)",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-main)",
-                fontSize: "0.85rem",
-                fontWeight: "600",
-                cursor: "pointer"
-              }}
-            >
-              <Download size={15} color="#2563eb" /> Download .docx Template
-            </button>
             <button
               onClick={() => handleDownloadTemplate("xlsx")}
               style={{
@@ -347,7 +325,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Info size={18} color="var(--sky-blue)" />
             <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0, color: "var(--text-main)" }}>
-              Standard Timetable Document / Spreadsheet Format Specification
+              Standard Excel Timetable Spreadsheet Format Specification
             </h3>
           </div>
           <span style={{ fontSize: "0.85rem", color: "var(--sky-blue)", fontWeight: "600" }}>
@@ -358,7 +336,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
         {showFormatGuide && (
           <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
             <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              The document table or spreadsheet must have a header row with the following column names (case-insensitive). Blank cells are safely kept empty.
+              The Excel sheet must have a header row with the following column names (case-insensitive). Blank cells are safely kept empty.
             </p>
 
             <div style={{ overflowX: "auto" }}>
@@ -432,22 +410,22 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
           <input
             ref={fileInputRef}
             type="file"
-            accept=".docx, .doc, .xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
+            accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
             onChange={handleFileChange}
             style={{ display: "none" }}
           />
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
             <div style={{ width: "56px", height: "56px", borderRadius: "14px", backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {fileType === "doc" ? <FileText size={28} /> : <FileSpreadsheet size={28} />}
+              <FileSpreadsheet size={28} />
             </div>
 
             <div>
               <h4 style={{ margin: "0 0 0.25rem 0", fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)" }}>
-                {file ? file.name : "Click to select or drag & drop Timetable Word Document or Excel file"}
+                {file ? file.name : "Click to select or drag & drop Timetable Excel file"}
               </h4>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                Supports Microsoft Word (.docx, .doc), Microsoft Excel (.xlsx, .xls), and CSV (.csv)
+                Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv)
               </p>
             </div>
 

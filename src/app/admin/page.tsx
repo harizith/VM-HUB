@@ -109,7 +109,7 @@ export default function AdminPage() {
 
   // Timetable State
   const [timetableMode, setTimetableMode] = useState<"faculty" | "class">("faculty");
-  const [timetableUploadTab, setTimetableUploadTab] = useState<"doc-excel" | "pdf">("doc-excel");
+  const [timetableUploadTab, setTimetableUploadTab] = useState<"excel" | "pdf-doc">("excel");
   const [timetableCalendarView, setTimetableCalendarView] = useState(false);
   const [selectedDept, setSelectedDept] = useState("CSE");
   const [selectedYear, setSelectedYear] = useState("II");
@@ -1505,11 +1505,11 @@ export default function AdminPage() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "var(--text-main)" }}>
-                      Upload Type:
+                      Upload Mode:
                     </span>
                     <div style={{ display: "flex", backgroundColor: "var(--bg-input)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
                       <button
-                        onClick={() => setTimetableUploadTab("doc-excel")}
+                        onClick={() => setTimetableUploadTab("excel")}
                         style={{
                           padding: "0.4rem 0.9rem",
                           borderRadius: "6px",
@@ -1517,15 +1517,15 @@ export default function AdminPage() {
                           fontWeight: "700",
                           border: "none",
                           cursor: "pointer",
-                          backgroundColor: timetableUploadTab === "doc-excel" ? "var(--royal-blue)" : "transparent",
-                          color: timetableUploadTab === "doc-excel" ? "#fff" : "var(--text-muted)",
+                          backgroundColor: timetableUploadTab === "excel" ? "var(--royal-blue)" : "transparent",
+                          color: timetableUploadTab === "excel" ? "#fff" : "var(--text-muted)",
                           transition: "all 0.2s"
                         }}
                       >
-                        📄 Word (.docx/.doc) & Excel (.xlsx)
+                        📊 1. Excel (.xlsx / .csv)
                       </button>
                       <button
-                        onClick={() => setTimetableUploadTab("pdf")}
+                        onClick={() => setTimetableUploadTab("pdf-doc")}
                         style={{
                           padding: "0.4rem 0.9rem",
                           borderRadius: "6px",
@@ -1533,12 +1533,12 @@ export default function AdminPage() {
                           fontWeight: "700",
                           border: "none",
                           cursor: "pointer",
-                          backgroundColor: timetableUploadTab === "pdf" ? "var(--royal-blue)" : "transparent",
-                          color: timetableUploadTab === "pdf" ? "#fff" : "var(--text-muted)",
+                          backgroundColor: timetableUploadTab === "pdf-doc" ? "var(--royal-blue)" : "transparent",
+                          color: timetableUploadTab === "pdf-doc" ? "#fff" : "var(--text-muted)",
                           transition: "all 0.2s"
                         }}
                       >
-                        📑 PDF Document (.pdf)
+                        📑 2. PDF or Word (.pdf / .docx)
                       </button>
                     </div>
                   </div>
@@ -1585,7 +1585,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {timetableUploadTab === "doc-excel" ? (
+                {timetableUploadTab === "excel" ? (
                   <AdminTimetableExcelUpload
                     onUploadSuccess={() => {
                       fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
