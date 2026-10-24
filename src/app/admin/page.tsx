@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle, UserCheck } from "lucide-react";
 import AdminAgentChat from "@/components/AdminAgentChat";
 import AdminTimetablePdfUpload from "@/components/AdminTimetablePdfUpload";
@@ -451,8 +452,11 @@ export default function AdminPage() {
     fetchData(); 
   }, []);
 
+  // Filter users: hide system admin accounts from the view
+  const nonAdminUsers = users.filter((u) => u.role !== "ADMIN");
+
   // Filter users by active subdivision
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = nonAdminUsers.filter((u) => {
     if (userRoleSubdivision === "ALL") return true;
     return u.role === userRoleSubdivision;
   });
@@ -608,7 +612,7 @@ export default function AdminPage() {
 
           <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {[
-              { id: "users", label: "User Accounts", Icon: Users, count: users.length },
+              { id: "users", label: "User Accounts", Icon: Users, count: nonAdminUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
               { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
@@ -690,9 +694,9 @@ export default function AdminPage() {
           <button onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", width: "100%", backgroundColor: "var(--bg-input)", color: "var(--text-main)", border: "1px solid var(--border-subtle)", padding: "0.6rem", borderRadius: "8px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
             {theme === "dark" ? <><Sun size={16} /> Light Mode</> : <><Moon size={16} /> Dark Mode</>}
           </button>
-          <Link href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", color: "#ef4444", fontSize: "0.85rem", textDecoration: "none", border: "1px solid rgba(239, 68, 68, 0.3)", backgroundColor: "rgba(239, 68, 68, 0.1)", padding: "0.6rem", borderRadius: "8px", fontWeight: "600" }}>
+          <button onClick={() => signOut({ callbackUrl: "/" })} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", color: "#ef4444", fontSize: "0.85rem", border: "1px solid rgba(239, 68, 68, 0.3)", backgroundColor: "rgba(239, 68, 68, 0.1)", padding: "0.6rem", borderRadius: "8px", fontWeight: "600", cursor: "pointer" }}>
             Sign Out
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -744,11 +748,10 @@ export default function AdminPage() {
                 {/* ROLE SUBDIVISION PILLS */}
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "0.5rem", borderRadius: "10px", border: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                   {[
-                    { id: "ALL", label: "All Accounts", Icon: Globe, count: users.length },
-                    { id: "STUDENT", label: "Students", Icon: GraduationCap, count: users.filter((u) => u.role === "STUDENT").length },
-                    { id: "FACULTY", label: "Teachers / Faculty", Icon: Briefcase, count: users.filter((u) => u.role === "FACULTY").length },
-                    { id: "HOD", label: "HODs", Icon: UserCircle, count: users.filter((u) => u.role === "HOD").length },
-                    { id: "ADMIN", label: "Administrators", Icon: Shield, count: users.filter((u) => u.role === "ADMIN").length },
+                    { id: "ALL", label: "All Accounts", Icon: Globe, count: nonAdminUsers.length },
+                    { id: "STUDENT", label: "Students", Icon: GraduationCap, count: nonAdminUsers.filter((u) => u.role === "STUDENT").length },
+                    { id: "FACULTY", label: "Teachers / Faculty", Icon: Briefcase, count: nonAdminUsers.filter((u) => u.role === "FACULTY").length },
+                    { id: "HOD", label: "HODs", Icon: UserCircle, count: nonAdminUsers.filter((u) => u.role === "HOD").length },
                   ].map((sub) => (
                     <button
                       key={sub.id}
