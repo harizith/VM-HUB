@@ -26,19 +26,22 @@ export default function LoginForm() {
         redirect: false,
       });
 
-      if (res?.status === 200 || res?.ok) {
+      if (res?.ok && !res?.error) {
         // Fetch session to determine role from DB record
-        const sessionRes = await fetch("/api/auth/session").then((r) => r.json());
+        const sessionRes = await fetch("/api/auth/session", {
+          cache: "no-store",
+          credentials: "same-origin",
+        }).then((r) => r.json());
         const userRole = sessionRes?.user?.role;
 
         if (userRole === "ADMIN") {
-          window.location.href = "/admin";
+          window.location.replace("/admin");
         } else if (userRole === "HOD") {
-          window.location.href = "/hod";
+          window.location.replace("/hod");
         } else if (userRole === "TEACHER" || userRole === "STAFF" || userRole === "FACULTY") {
-          window.location.href = "/teacher";
+          window.location.replace("/teacher");
         } else {
-          window.location.href = "/student";
+          window.location.replace("/student");
         }
       } else {
         console.error("SignIn failed:", res);

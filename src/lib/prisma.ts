@@ -467,12 +467,71 @@ const modelMapping: Record<string, keyof InMemoryStore> = {
   attendance: "attendance",
 };
 
-// Initialize native PrismaClient or Mock fallback
+// Export in-memory store instance
+export const inMemoryPrisma = new Proxy(
+  {},
+  {
+    get: (_, prop: string) => {
+      const collectionKey = modelMapping[prop] || (modelMapping[prop.toLowerCase()] as keyof InMemoryStore);
+      if (collectionKey) {
+        return createModelHandler(collectionKey);
+      }
+      return {
+        findMany: async () => [],
+        findFirst: async () => null,
+        findUnique: async () => null,
+        create: async (d: any) => d?.data ?? {},
+        update: async (d: any) => d?.data ?? {},
+        delete: async () => ({}),
+        deleteMany: async () => ({ count: 0 }),
+        updateMany: async () => ({ count: 0 }),
+        upsert: async (d: any) => d?.create ?? {},
+        count: async () => 0,
+      };
+    },
+  }
+) as unknown as PrismaClient;
+
+// Format database URL with connection pooling and timeout settings
+function getPooledDatabaseUrl(): string | undefined {
+  const rawUrl = process.env.DATABASE_URL;
+  if (!rawUrl || rawUrl.includes("localhost")) return rawUrl;
+
+  try {
+    const url = new URL(rawUrl);
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", "3");
+    }
+    if (!url.searchParams.has("pool_timeout")) {
+      url.searchParams.set("pool_timeout", "20");
+    }
+    if (!url.searchParams.has("connect_timeout")) {
+      url.searchParams.set("connect_timeout", "15");
+    }
+    if (url.port === "6543" && !url.searchParams.has("pgbouncer")) {
+      url.searchParams.set("pgbouncer", "true");
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+// Initialize native PrismaClient with global caching across all environments
 let realPrisma: PrismaClient | null = null;
 try {
-  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("localhost")) {
-    realPrisma = globalThis.prismaGlobal ?? new PrismaClient();
-    if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = realPrisma;
+  const pooledUrl = getPooledDatabaseUrl();
+  if (pooledUrl && !pooledUrl.includes("localhost")) {
+    realPrisma =
+      globalThis.prismaGlobal ??
+      new PrismaClient({
+        datasources: {
+          db: {
+            url: pooledUrl,
+          },
+        },
+      });
+    globalThis.prismaGlobal = realPrisma;
   }
 } catch {
   console.warn("[AI Studio] Real database connection failed. Falling back to in-memory store.");
