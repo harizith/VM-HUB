@@ -14,15 +14,36 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
   for (const apiKey of apiKeys) {
     try {
       const groqClient = new Groq({ apiKey });
-      const options: any = {
-        messages,
-        model: 'openai/gpt-oss-120b',
-      };
-      if (tools) {
-        options.tools = tools;
-        options.tool_choice = 'auto';
+      const modelsToTry = [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+        'openai/gpt-oss-120b',
+        'mixtral-8x7b-32768'
+      ];
+      
+      let clientError: any;
+      for (const model of modelsToTry) {
+        try {
+          const options: any = {
+            messages,
+            model,
+          };
+          if (tools) {
+            options.tools = tools;
+            options.tool_choice = 'auto';
+          }
+          return await groqClient.chat.completions.create(options);
+        } catch (modelErr: any) {
+          clientError = modelErr;
+          const msg = modelErr?.message || String(modelErr);
+          if (msg.includes('model') || msg.includes('decommissioned') || msg.includes('not found')) {
+            console.warn(`Model ${model} unavailable, trying next model...`);
+            continue;
+          }
+          throw modelErr;
+        }
       }
-      return await groqClient.chat.completions.create(options);
+      throw clientError;
     } catch (error: any) {
       const errStr = error?.message || String(error);
       if (errStr.includes('rate_limit') || errStr.includes('tokens per minute') || error?.status === 429 || error?.status === 413) {
