@@ -71,7 +71,13 @@ function parsePeriod(value: string | undefined | null): number | null {
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  // Preserve paragraph and break boundaries with newlines so sub-elements (e.g. subject on line 1, class on line 2) are preserved
+  return html
+    .replace(/<\/p>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 /**
@@ -126,7 +132,7 @@ function extractDocContext(text: string) {
   if (roomMatch) roomNo = roomMatch[1].trim();
 
   // Subject details / course mapping lookup
-  // e.g. "Sub-1: 231CB721 - Software Project Management (SPM) | Sem/Sec: IV-CSE-A | Room: N-201"
+  // e.g. "• Sub-1: 231CB721 - Software Project Management (SPM) | Sem/Sec: IV-CSE-A | Room: N-201"
   const subjectMap = new Map<string, { code: string; name: string; classId?: string; room?: string }>();
   const subjectLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
@@ -139,8 +145,12 @@ function extractDocContext(text: string) {
       const parenMatch = line.match(/\(([A-Z0-9\s-]+)\)/);
       const alias = parenMatch ? parenMatch[1].trim() : "";
 
-      const nameMatch = line.match(/[-:]\s*(.+?)(?:\s*\([A-Z0-9\s-]+\)|\s*\|)/);
-      const name = nameMatch ? nameMatch[1].trim() : "";
+      // Match subject name after code or dash
+      let name = "";
+      const nameMatch = line.match(/(?:[-:]\s*(?:[0-9]{3}[A-Z]{2,3}[0-9A-Z]{2,4}\s*-\s*)?)(.+?)(?:\s*\([A-Z0-9\s-]+\)|\s*\||$)/);
+      if (nameMatch) {
+        name = nameMatch[1].replace(/^[0-9A-Z\s-]+:\s*/, "").replace(/^[0-9]{3}[A-Z]{2,3}[0-9A-Z]{2,4}\s*-\s*/, "").trim();
+      }
 
       const secMatch = line.match(/(?:Sem\/Sec|Class):?\s*([A-Za-z0-9-]+)/i);
       const rowClass = secMatch ? secMatch[1].trim() : undefined;
@@ -220,9 +230,20 @@ function parseGridTable(
       if (!cell || cell === "-" || cell === "—" || cell.toUpperCase() === "LUNCH") continue;
 
       // Extract subject, section/class, room
-      const lines = cell.split(/\s{2,}|\n/).map(s => s.trim()).filter(Boolean);
-      const subjectToken = lines[0] || cell;
-      const extraToken = lines[1] || "";
+      const lines = cell.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      let subjectToken = lines[0] || cell;
+      let extraToken = lines[1] || "";
+
+      // If everything was on a single line with space e.g. "PE-V IV-CSE-A"
+      if (!extraToken && subjectToken.includes(" ")) {
+        const parts = subjectToken.split(/\s+/);
+        // Look for class pattern (e.g. IV-CSE-A or II-ECE-B)
+        const classIdx = parts.findIndex(p => /^[I|V|X]+-[A-Z]+-[A-Z0-9]+$/i.test(p) || /^[A-Z0-9]+-[A-Z]+-[A-Z0-9]+$/i.test(p));
+        if (classIdx > 0) {
+          extraToken = parts.slice(classIdx).join(" ");
+          subjectToken = parts.slice(0, classIdx).join(" ");
+        }
+      }
 
       let subjectCode: string | null = null;
       let subjectName: string | null = subjectToken;
