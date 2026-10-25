@@ -74,6 +74,56 @@ export default function TeacherSubjectAllocation({
     Record<string, { facultyName: string; vmsNo: string; roomNo: string }>
   >({});
 
+  // Per-subject Period Rules: subjectCode -> { periodsPerWeek: number, isContinuous: boolean }
+  const [subjectRules, setSubjectRules] = useState<
+    Record<string, { periodsPerWeek: number; isContinuous: boolean }>
+  >({});
+
+  // Priority Special Slots Configuration (Sports, Electives, Library)
+  const [sportsConfig, setSportsConfig] = useState<{
+    enabled: boolean;
+    dayOrder: string;
+    periods: [number, number]; // e.g. [7, 8]
+    roomNo: string;
+    facultyName: string;
+  }>({
+    enabled: true,
+    dayOrder: "V", // Day Order V by default
+    periods: [7, 8], // Last 2 periods
+    roomNo: "GROUND",
+    facultyName: "Physical Director",
+  });
+
+  const [libraryConfig, setLibraryConfig] = useState<{
+    enabled: boolean;
+    dayOrder: string;
+    period: number;
+    roomNo: string;
+  }>({
+    enabled: true,
+    dayOrder: "III",
+    period: 6,
+    roomNo: "CENTRAL-LIB",
+  });
+
+  const [electiveConfig, setElectiveConfig] = useState<{
+    enabled: boolean;
+    code: string;
+    name: string;
+    dayOrder: string;
+    periods: [number, number]; // e.g. [5, 6]
+    facultyName: string;
+    roomNo: string;
+  }>({
+    enabled: false,
+    code: "EP-OPEN",
+    name: "Professional Elective / Open Elective",
+    dayOrder: "IV",
+    periods: [5, 6],
+    facultyName: "Elective Coordinator",
+    roomNo: "AUDITORIUM",
+  });
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "LAB" | "THEORY">("ALL");
@@ -389,12 +439,22 @@ export default function TeacherSubjectAllocation({
         }
       });
 
+      // Build subjectRules dictionary
+      const payloadRules: Record<string, { periodsPerWeek: number; isContinuous: boolean }> = {};
+      Object.entries(subjectRules).forEach(([code, r]) => {
+        payloadRules[code] = r;
+      });
+
       const res = await fetch("/api/admin/timetable/randomize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           classId: computedClassId,
           teacherAssignments: payloadAssignments,
+          subjectRules: payloadRules,
+          sportsConfig,
+          libraryConfig,
+          electiveConfig,
         }),
       }).then((r) => r.json());
 
@@ -579,6 +639,179 @@ export default function TeacherSubjectAllocation({
             >
               <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>TARGET CLASS</span>
               <strong style={{ fontSize: "1rem", color: "var(--sky-blue)", letterSpacing: "0.03em" }}>{computedClassId}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Priority Special Slots Deck (Sports, Electives, Library) */}
+        <div
+          style={{
+            marginTop: "1rem",
+            padding: "1rem 1.25rem",
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            borderRadius: "12px",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "var(--sky-blue)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                ⚡ Priority Slots Allocation Engine
+              </span>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                (1. Sports 2-P • 2. Labs 2-P • 3. Electives • 4. Library • 5. Subjects)
+              </span>
+            </div>
+            <span style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", borderRadius: "6px", backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10b981", fontWeight: "600" }}>
+              Sync Across Year & Dept • Zero Faculty Clashes
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
+            {/* 1. Sports Priority */}
+            <div style={{ padding: "0.85rem", borderRadius: "10px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#38bdf8", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={sportsConfig.enabled}
+                    onChange={(e) => setSportsConfig({ ...sportsConfig, enabled: e.target.checked })}
+                    style={{ accentColor: "#38bdf8", cursor: "pointer" }}
+                  />
+                  1. Sports (2 Continuous Periods)
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Year-synchronized</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Day Order</span>
+                  <select
+                    disabled={!sportsConfig.enabled}
+                    value={sportsConfig.dayOrder}
+                    onChange={(e) => setSportsConfig({ ...sportsConfig, dayOrder: e.target.value })}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    {["I", "II", "III", "IV", "V"].map((d) => (
+                      <option key={d} value={d}>Day Order {d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Time Slot</span>
+                  <select
+                    disabled={!sportsConfig.enabled}
+                    value={`${sportsConfig.periods[0]}-${sportsConfig.periods[1]}`}
+                    onChange={(e) => {
+                      const [p1, p2] = e.target.value.split("-").map(Number);
+                      setSportsConfig({ ...sportsConfig, periods: [p1, p2] });
+                    }}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    <option value="7-8">Periods 7 & 8 (Last 2 Periods)</option>
+                    <option value="5-6">Periods 5 & 6 (Afternoon Block)</option>
+                    <option value="3-4">Periods 3 & 4 (Mid-Day Block)</option>
+                    <option value="1-2">Periods 1 & 2 (Morning Block)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Electives (EP) Priority */}
+            <div style={{ padding: "0.85rem", borderRadius: "10px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#c084fc", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={electiveConfig.enabled}
+                    onChange={(e) => setElectiveConfig({ ...electiveConfig, enabled: e.target.checked })}
+                    style={{ accentColor: "#c084fc", cursor: "pointer" }}
+                  />
+                  2. Electives (EP) Slot
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Dept-wide Sync</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Day Order</span>
+                  <select
+                    disabled={!electiveConfig.enabled}
+                    value={electiveConfig.dayOrder}
+                    onChange={(e) => setElectiveConfig({ ...electiveConfig, dayOrder: e.target.value })}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    {["I", "II", "III", "IV", "V"].map((d) => (
+                      <option key={d} value={d}>Day Order {d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Time Slot</span>
+                  <select
+                    disabled={!electiveConfig.enabled}
+                    value={`${electiveConfig.periods[0]}-${electiveConfig.periods[1]}`}
+                    onChange={(e) => {
+                      const [p1, p2] = e.target.value.split("-").map(Number);
+                      setElectiveConfig({ ...electiveConfig, periods: [p1, p2] });
+                    }}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    <option value="5-6">Periods 5 & 6 (2-P Block)</option>
+                    <option value="3-4">Periods 3 & 4 (2-P Block)</option>
+                    <option value="1-2">Periods 1 & 2 (2-P Block)</option>
+                    <option value="7-8">Periods 7 & 8 (2-P Block)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Library Priority */}
+            <div style={{ padding: "0.85rem", borderRadius: "10px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#fbbf24", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={libraryConfig.enabled}
+                    onChange={(e) => setLibraryConfig({ ...libraryConfig, enabled: e.target.checked })}
+                    style={{ accentColor: "#fbbf24", cursor: "pointer" }}
+                  />
+                  3. Library (1 Period/Wk)
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Single Period</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Day Order</span>
+                  <select
+                    disabled={!libraryConfig.enabled}
+                    value={libraryConfig.dayOrder}
+                    onChange={(e) => setLibraryConfig({ ...libraryConfig, dayOrder: e.target.value })}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    {["I", "II", "III", "IV", "V"].map((d) => (
+                      <option key={d} value={d}>Day Order {d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Period</span>
+                  <select
+                    disabled={!libraryConfig.enabled}
+                    value={libraryConfig.period}
+                    onChange={(e) => setLibraryConfig({ ...libraryConfig, period: Number(e.target.value) })}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
+                      <option key={p} value={p}>Period {p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -901,9 +1134,11 @@ export default function TeacherSubjectAllocation({
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>CODE</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600" }}>SUBJECT NAME</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "80px" }}>TYPE</th>
-                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", minWidth: "250px" }}>ASSIGNED TEACHER / FACULTY</th>
-                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>MTS NO</th>
-                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "80px", textAlign: "center" }}>ACTION</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", minWidth: "220px" }}>ASSIGNED TEACHER / FACULTY</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>PERIODS / WK</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "130px" }}>BLOCK MODE</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "90px" }}>MTS NO</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "70px", textAlign: "center" }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -913,6 +1148,10 @@ export default function TeacherSubjectAllocation({
                     facultyName: "",
                     vmsNo: "",
                     roomNo: isLab ? "CS-LAB-1" : "LH-201",
+                  };
+                  const currentRule = subjectRules[sub.code] || {
+                    periodsPerWeek: isLab ? 2 : (sub.credits >= 4 ? 4 : (sub.credits || 3)),
+                    isContinuous: isLab ? true : false,
                   };
 
                   return (
@@ -977,6 +1216,62 @@ export default function TeacherSubjectAllocation({
                             );
                           })}
                         </select>
+                      </td>
+                      {/* Periods Per Week Selector */}
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        <select
+                          value={currentRule.periodsPerWeek}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1;
+                            setSubjectRules((prev) => ({
+                              ...prev,
+                              [sub.code]: {
+                                ...(prev[sub.code] || currentRule),
+                                periodsPerWeek: val,
+                              },
+                            }));
+                          }}
+                          className="premium-input"
+                          style={{ padding: "0.35rem 0.5rem", fontSize: "0.82rem", width: "90px" }}
+                        >
+                          <option value={1}>1 P / wk</option>
+                          <option value={2}>2 P / wk</option>
+                          <option value={3}>3 P / wk</option>
+                          <option value={4}>4 P / wk</option>
+                          <option value={5}>5 P / wk</option>
+                          <option value={6}>6 P / wk</option>
+                        </select>
+                      </td>
+                      {/* Continuous 2-Period Block Option */}
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                            cursor: "pointer",
+                            fontSize: "0.78rem",
+                            fontWeight: "600",
+                            color: currentRule.isContinuous ? "var(--sky-blue)" : "var(--text-muted)",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={currentRule.isContinuous}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setSubjectRules((prev) => ({
+                                ...prev,
+                                [sub.code]: {
+                                  ...(prev[sub.code] || currentRule),
+                                  isContinuous: isChecked,
+                                },
+                              }));
+                            }}
+                            style={{ accentColor: "var(--sky-blue)", cursor: "pointer" }}
+                          />
+                          {currentRule.isContinuous ? "2-P Block ⚡" : "1-P Single"}
+                        </label>
                       </td>
                       <td style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>
                         {currentAssignment.vmsNo || "—"}
