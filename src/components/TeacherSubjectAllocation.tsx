@@ -152,23 +152,42 @@ export default function TeacherSubjectAllocation({
     loadData();
   }, []);
 
-  // Filter subjects for the selected department and relevant semester
+  // Scope filter: "SEMESTER" (default for target class), "ALL_CATALOG" (every course catalog subject), or specific semester "1".."8"
+  const [semesterFilter, setSemesterFilter] = useState<string>("ALL_CATALOG");
+
+  // Filter subjects based on scope, department, semester, search, and lab/theory
   const relevantSubjects = useMemo(() => {
     return catalogSubjects.filter((s) => {
+      // If showing all catalog subjects, don't restrict department or semester unless explicitly chosen
       const matchDept =
-        !selectedDept ||
-        s.departmentCode.toUpperCase() === selectedDept.toUpperCase() ||
-        s.departmentCode.toUpperCase() === "ALL";
+        semesterFilter === "ALL_CATALOG"
+          ? true
+          : !selectedDept ||
+            s.departmentCode.toUpperCase() === selectedDept.toUpperCase() ||
+            s.departmentCode.toUpperCase() === "ALL";
 
-      // Match semester (e.g., Year II matches semester 3 or 4)
-      const allowedSems = [computedSemester, computedSemester + 1];
-      const matchSem = allowedSems.includes(s.semester);
+      // Match semester
+      let matchSem = true;
+      if (semesterFilter === "ALL_CATALOG") {
+        matchSem = true;
+      } else if (semesterFilter === "YEAR") {
+        const allowedSems = [computedSemester, computedSemester + 1];
+        matchSem = allowedSems.includes(s.semester);
+      } else if (semesterFilter === "SEMESTER") {
+        matchSem = s.semester === computedSemester;
+      } else if (semesterFilter !== "ALL") {
+        const targetSem = parseInt(semesterFilter);
+        if (!isNaN(targetSem)) {
+          matchSem = s.semester === targetSem;
+        }
+      }
 
       // Search query
       const matchSearch =
         !searchQuery ||
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.code.toLowerCase().includes(searchQuery.toLowerCase());
+        s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.departmentCode.toLowerCase().includes(searchQuery.toLowerCase());
 
       // Lab vs Theory
       const isLab = s.name.toLowerCase().includes("lab") || s.code.toLowerCase().includes("lab");
@@ -177,7 +196,7 @@ export default function TeacherSubjectAllocation({
 
       return matchDept && matchSem && matchSearch && matchType;
     });
-  }, [catalogSubjects, selectedDept, computedSemester, searchQuery, filterType]);
+  }, [catalogSubjects, semesterFilter, selectedDept, computedSemester, searchQuery, filterType]);
 
   // Check if subject is Lab
   const checkIfLab = (sub: SubjectItem) => {
@@ -720,11 +739,44 @@ export default function TeacherSubjectAllocation({
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <BookOpen size={18} style={{ color: "var(--sky-blue)" }} />
             <span style={{ fontWeight: "700", fontSize: "0.95rem", color: "var(--text-main)" }}>
-              {selectedDept} Semester {computedSemester} Subjects ({relevantSubjects.length})
+              {semesterFilter === "ALL_CATALOG"
+                ? `All Course Catalog Subjects (${relevantSubjects.length})`
+                : semesterFilter === "YEAR"
+                ? `${selectedDept} Year ${selectedYear} (Sem ${computedSemester}-${computedSemester + 1}) Subjects (${relevantSubjects.length})`
+                : `${selectedDept} Semester ${semesterFilter === "SEMESTER" ? computedSemester : semesterFilter} Subjects (${relevantSubjects.length})`}
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            {/* Catalog Scope / Semester Filter */}
+            <select
+              value={semesterFilter}
+              onChange={(e) => setSemesterFilter(e.target.value)}
+              style={{
+                padding: "0.45rem 0.65rem",
+                borderRadius: "6px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-input)",
+                color: "var(--sky-blue)",
+                fontWeight: "600",
+                fontSize: "0.8rem",
+              }}
+              title="Filter subjects shown in allocation table"
+            >
+              <option value="ALL_CATALOG">📚 All Course Catalog Subjects ({catalogSubjects.length})</option>
+              <option value="YEAR">🎯 Target Year {selectedYear} (Sem {computedSemester}-{computedSemester + 1})</option>
+              <option value="SEMESTER">📌 Target Semester {computedSemester}</option>
+              <option disabled>──────────</option>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
+            </select>
+
             {/* Search */}
             <div style={{ position: "relative" }}>
               <input
@@ -739,7 +791,7 @@ export default function TeacherSubjectAllocation({
                   backgroundColor: "var(--bg-input)",
                   color: "var(--text-main)",
                   fontSize: "0.8rem",
-                  width: "190px",
+                  width: "180px",
                 }}
               />
               <Search size={13} style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
@@ -792,28 +844,54 @@ export default function TeacherSubjectAllocation({
           </div>
         ) : relevantSubjects.length === 0 ? (
           <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
-            <p style={{ margin: "0 0 0.5rem 0", fontWeight: "600", fontSize: "1rem" }}>No subjects found for {selectedDept} Semester {computedSemester}</p>
-            <span style={{ fontSize: "0.85rem", display: "block", marginBottom: "1rem" }}>
-              Add a new course directly below or from the Course Catalog.
+            <p style={{ margin: "0 0 0.5rem 0", fontWeight: "600", fontSize: "1rem" }}>
+              No subjects found for {semesterFilter === "ALL_CATALOG" ? "Course Catalog" : `${selectedDept} Semester ${computedSemester}`}
+            </p>
+            <span style={{ fontSize: "0.85rem", display: "block", marginBottom: "1.25rem" }}>
+              {catalogSubjects.length > 0 && semesterFilter !== "ALL_CATALOG"
+                ? `There are ${catalogSubjects.length} subjects in the Course Catalog across all semesters/departments.`
+                : "Add a new course directly below or from the Course Catalog."}
             </span>
-            <button
-              onClick={handleOpenCreateModal}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: "var(--royal-blue)",
-                color: "#fff",
-                fontWeight: "600",
-                fontSize: "0.85rem",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.4rem"
-              }}
-            >
-              <Plus size={15} /> Add Subject for Semester {computedSemester}
-            </button>
+            <div style={{ display: "inline-flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+              {catalogSubjects.length > 0 && semesterFilter !== "ALL_CATALOG" && (
+                <button
+                  onClick={() => setSemesterFilter("ALL_CATALOG")}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--sky-blue)",
+                    backgroundColor: "rgba(56, 189, 248, 0.12)",
+                    color: "var(--sky-blue)",
+                    fontWeight: "600",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                >
+                  <BookOpen size={15} /> Show Every Course Catalog Subject ({catalogSubjects.length})
+                </button>
+              )}
+              <button
+                onClick={handleOpenCreateModal}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "var(--royal-blue)",
+                  color: "#fff",
+                  fontWeight: "600",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <Plus size={15} /> Add Subject for Semester {computedSemester}
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -851,7 +929,7 @@ export default function TeacherSubjectAllocation({
                       <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: "500" }}>
                         <div>{sub.name}</div>
                         <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                          Credits: {sub.credits} • Sem {sub.semester}
+                          Dept: <strong style={{ color: "var(--sky-blue)" }}>{sub.departmentCode || "ALL"}</strong> • Sem {sub.semester} • Credits: {sub.credits}
                         </span>
                       </td>
                       <td style={{ padding: "0.75rem 1rem" }}>

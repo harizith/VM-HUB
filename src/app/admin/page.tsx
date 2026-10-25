@@ -91,6 +91,7 @@ interface TimetableEntry {
 export default function AdminPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [activeTab, setActiveTab] = useState<"users" | "depts" | "subjects" | "teacher-allocations" | "notices" | "timetable" | "audit" | "upload-timetable" | "upload-users" | "automation">("users");
+  const [automationSubTab, setAutomationSubTab] = useState<"engine" | "audit">("engine");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Role Subdivision Filter State
@@ -111,6 +112,7 @@ export default function AdminPage() {
   // Timetable State
   const [timetableMode, setTimetableMode] = useState<"faculty" | "class">("faculty");
   const [timetableUploadTab, setTimetableUploadTab] = useState<"excel" | "pdf-doc">("excel");
+  const [importSubTab, setImportSubTab] = useState<"timetable" | "users">("timetable");
   const [timetableCalendarView, setTimetableCalendarView] = useState(false);
   const [selectedDept, setSelectedDept] = useState("CSE");
   const [selectedYear, setSelectedYear] = useState("II");
@@ -618,16 +620,54 @@ export default function AdminPage() {
               { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
-              { id: "upload-timetable", label: "Timetable Import & Templates", Icon: FileText, count: 0 },
-              { id: "upload-users", label: "Bulk User Onboarding", Icon: UserPlus, count: 0 },
-              { id: "automation", label: "Automation Engine", Icon: Zap, count: 0 },
-              { id: "audit", label: "Audit Trail", Icon: Shield, count: auditLogs.length },
-            ].map((nav) => (
-              <button key={nav.id} onClick={() => { setActiveTab(nav.id as any); setSelectedUser(null); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "0.7rem 0.9rem", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "0.85rem", backgroundColor: activeTab === nav.id ? "var(--royal-blue)" : "transparent", color: activeTab === nav.id ? "#ffffff" : "var(--text-muted)", transition: "all 0.2s ease" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><nav.Icon size={16} /> {nav.label}</span>
-                <span style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", borderRadius: "9999px", backgroundColor: activeTab === nav.id ? "rgba(255,255,255,0.2)" : "var(--border-subtle)", color: activeTab === nav.id ? "#ffffff" : "var(--text-muted)" }}>{nav.count}</span>
-              </button>
-            ))}
+              { id: "upload-timetable", label: "Import & Onboarding Deck", Icon: FileText, count: 0 },
+              { id: "automation", label: "Automation & Audit Hub", Icon: Zap, count: auditLogs.length },
+            ].map((nav) => {
+              const isSelected =
+                activeTab === nav.id ||
+                (nav.id === "upload-timetable" && activeTab === "upload-users") ||
+                (nav.id === "automation" && activeTab === "audit");
+
+              return (
+                <button
+                  key={nav.id}
+                  onClick={() => {
+                    setActiveTab(nav.id as any);
+                    setSelectedUser(null);
+                  }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    padding: "0.7rem 0.9rem",
+                    borderRadius: "8px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                    fontSize: "0.85rem",
+                    backgroundColor: isSelected ? "var(--royal-blue)" : "transparent",
+                    color: isSelected ? "#ffffff" : "var(--text-muted)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <nav.Icon size={16} /> {nav.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0.15rem 0.5rem",
+                      borderRadius: "9999px",
+                      backgroundColor: isSelected ? "rgba(255,255,255,0.2)" : "var(--border-subtle)",
+                      color: isSelected ? "#ffffff" : "var(--text-muted)"
+                    }}
+                  >
+                    {nav.count}
+                  </span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -716,10 +756,8 @@ export default function AdminPage() {
                   {activeTab === "teacher-allocations" && "Subject-Handling Teacher Allocations & Randomize Deck"}
                   {activeTab === "notices" && "System Announcements & Broadcasts"}
                   {activeTab === "timetable" && "Class Timetable Management"}
-                  {activeTab === "upload-timetable" && "Timetable Import & Official Templates"}
-                  {activeTab === "upload-users" && "Bulk User Creation & Profile Setup"}
-                  {activeTab === "automation" && "Autonomous Operations & Intelligence Engine"}
-                  {activeTab === "audit" && "System Audit Trail & Security Logs"}
+                  {(activeTab === "upload-timetable" || activeTab === "upload-users") && "Bulk Onboarding, Timetable Import & Official Templates"}
+                  {(activeTab === "automation" || activeTab === "audit") && "Autonomous Operations, Diagnostics & Audit Trail"}
                 </h1>
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
               </div>
@@ -1395,23 +1433,78 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* AUTOMATION ENGINE TAB */}
-            {activeTab === "automation" && (
-              <AdminAutomationHub />
-            )}
+            {/* AUTOMATION ENGINE & AUDIT TRAIL MERGED TAB */}
+            {(activeTab === "automation" || activeTab === "audit") && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Subtab Navigator */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  padding: "0.4rem",
+                  backgroundColor: "var(--bg-card)",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-subtle)",
+                  width: "fit-content"
+                }}>
+                  <button
+                    onClick={() => { setActiveTab("automation"); setAutomationSubTab("engine"); }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "7px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "700",
+                      backgroundColor: automationSubTab === "engine" ? "var(--royal-blue)" : "transparent",
+                      color: automationSubTab === "engine" ? "#ffffff" : "var(--text-muted)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Zap size={16} /> Automation & Intelligence Engine
+                  </button>
 
-            {/* AUDIT LOGS TAB */}
-            {activeTab === "audit" && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
-                  <div>
-                    <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>System Audit Trail</h3>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>Real-time logs of administrative actions, user modifications, and security events</p>
-                  </div>
-                  <button onClick={fetchData} className="btn-sky" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
-                    🔄 Refresh Logs
+                  <button
+                    onClick={() => { setActiveTab("automation"); setAutomationSubTab("audit"); }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "7px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "700",
+                      backgroundColor: automationSubTab === "audit" ? "var(--royal-blue)" : "transparent",
+                      color: automationSubTab === "audit" ? "#ffffff" : "var(--text-muted)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Shield size={16} /> System Audit Trail ({auditLogs.length})
                   </button>
                 </div>
+
+                {/* Subtab 1: Automation Engine */}
+                {automationSubTab === "engine" && (
+                  <AdminAutomationHub />
+                )}
+
+                {/* Subtab 2: Audit Logs */}
+                {automationSubTab === "audit" && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+                      <div>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>System Audit Trail</h3>
+                        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>Real-time logs of administrative actions, user modifications, and security events</p>
+                      </div>
+                      <button onClick={fetchData} className="btn-sky" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
+                        🔄 Refresh Logs
+                      </button>
+                    </div>
 
                 {auditLogs.length > 0 ? (
                   <div className="responsive-table-wrapper">
@@ -1488,140 +1581,199 @@ export default function AdminPage() {
                     No audit records logged yet. System operations will automatically appear here.
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* TIMETABLE UPLOAD (WORD / EXCEL / PDF) */}
-            {activeTab === "upload-timetable" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                {/* Upload Format Toggle Header */}
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  backgroundColor: "var(--bg-card)",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "12px",
-                  border: "1px solid var(--border-subtle)",
-                  flexWrap: "wrap",
-                  gap: "0.75rem"
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "var(--text-main)" }}>
-                      Upload Mode:
-                    </span>
-                    <div style={{ display: "flex", backgroundColor: "var(--bg-input)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
-                      <button
-                        onClick={() => setTimetableUploadTab("excel")}
-                        style={{
-                          padding: "0.4rem 0.9rem",
-                          borderRadius: "6px",
-                          fontSize: "0.85rem",
-                          fontWeight: "700",
-                          border: "none",
-                          cursor: "pointer",
-                          backgroundColor: timetableUploadTab === "excel" ? "var(--royal-blue)" : "transparent",
-                          color: timetableUploadTab === "excel" ? "#fff" : "var(--text-muted)",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        📊 1. Excel (.xlsx / .csv)
-                      </button>
-                      <button
-                        onClick={() => setTimetableUploadTab("pdf-doc")}
-                        style={{
-                          padding: "0.4rem 0.9rem",
-                          borderRadius: "6px",
-                          fontSize: "0.85rem",
-                          fontWeight: "700",
-                          border: "none",
-                          cursor: "pointer",
-                          backgroundColor: timetableUploadTab === "pdf-doc" ? "var(--royal-blue)" : "transparent",
-                          color: timetableUploadTab === "pdf-doc" ? "#fff" : "var(--text-muted)",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        📑 2. PDF or Word (.pdf / .docx)
-                      </button>
-                    </div>
                   </div>
-
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <a
-                      href="/api/admin/timetable/template-doc"
-                      download="timetable-import-template.docx"
-                      style={{
-                        fontSize: "0.8rem",
-                        padding: "0.35rem 0.75rem",
-                        borderRadius: "6px",
-                        backgroundColor: "var(--bg-input)",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-main)",
-                        textDecoration: "none",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.3rem"
-                      }}
-                    >
-                      ⬇ Word Template (.docx)
-                    </a>
-                    <a
-                      href="/api/admin/timetable/template-pdf?type=individual"
-                      download="individual-faculty-timetable-template.pdf"
-                      style={{
-                        fontSize: "0.8rem",
-                        padding: "0.35rem 0.75rem",
-                        borderRadius: "6px",
-                        backgroundColor: "var(--bg-input)",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-main)",
-                        textDecoration: "none",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.3rem"
-                      }}
-                    >
-                      ⬇ PDF Template (.pdf)
-                    </a>
-                  </div>
-                </div>
-
-                {timetableUploadTab === "excel" ? (
-                  <AdminTimetableExcelUpload
-                    onUploadSuccess={() => {
-                      fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
-                        if (res.success) setAuditLogs(res.logs);
-                      });
-                      fetchData();
-                    }}
-                  />
-                ) : (
-                  <AdminTimetablePdfUpload
-                    onUploadSuccess={() => {
-                      fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
-                        if (res.success) setAuditLogs(res.logs);
-                      });
-                      fetchData();
-                    }}
-                  />
                 )}
               </div>
             )}
 
-            {/* BULK USER & PROFILE ONBOARDING */}
-            {activeTab === "upload-users" && (
-              <AdminUserExcelUpload
-                onUploadSuccess={() => {
-                  fetch("/api/admin/users").then((r) => r.json()).then((res) => {
-                    if (res.success) setUsers(res.users);
-                  });
-                  fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
-                    if (res.success) setAuditLogs(res.logs);
-                  });
-                }}
-              />
+            {/* MERGED TIMETABLE IMPORT & BULK USER ONBOARDING DECK */}
+            {(activeTab === "upload-timetable" || activeTab === "upload-users") && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Deck Mode Navigator */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  padding: "0.4rem",
+                  backgroundColor: "var(--bg-card)",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-subtle)",
+                  width: "fit-content"
+                }}>
+                  <button
+                    onClick={() => { setActiveTab("upload-timetable"); setImportSubTab("timetable"); }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "7px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "700",
+                      backgroundColor: (importSubTab === "timetable" && activeTab !== "upload-users") ? "var(--royal-blue)" : "transparent",
+                      color: (importSubTab === "timetable" && activeTab !== "upload-users") ? "#ffffff" : "var(--text-muted)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <FileText size={16} /> Timetable Import & Official Templates
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab("upload-timetable"); setImportSubTab("users"); }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "7px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "700",
+                      backgroundColor: (importSubTab === "users" || activeTab === "upload-users") ? "var(--royal-blue)" : "transparent",
+                      color: (importSubTab === "users" || activeTab === "upload-users") ? "#ffffff" : "var(--text-muted)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <UserPlus size={16} /> Bulk User Onboarding (Excel)
+                  </button>
+                </div>
+
+                {/* Subtab 1: Timetable Upload */}
+                {(importSubTab === "timetable" && activeTab !== "upload-users") && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                    {/* Upload Format Toggle Header */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      backgroundColor: "var(--bg-card)",
+                      padding: "0.75rem 1rem",
+                      borderRadius: "12px",
+                      border: "1px solid var(--border-subtle)",
+                      flexWrap: "wrap",
+                      gap: "0.75rem"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "var(--text-main)" }}>
+                          Upload Mode:
+                        </span>
+                        <div style={{ display: "flex", backgroundColor: "var(--bg-input)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
+                          <button
+                            onClick={() => setTimetableUploadTab("excel")}
+                            style={{
+                              padding: "0.4rem 0.9rem",
+                              borderRadius: "6px",
+                              fontSize: "0.85rem",
+                              fontWeight: "700",
+                              border: "none",
+                              cursor: "pointer",
+                              backgroundColor: timetableUploadTab === "excel" ? "var(--royal-blue)" : "transparent",
+                              color: timetableUploadTab === "excel" ? "#fff" : "var(--text-muted)",
+                              transition: "all 0.2s"
+                            }}
+                          >
+                            📊 1. Excel (.xlsx / .csv)
+                          </button>
+                          <button
+                            onClick={() => setTimetableUploadTab("pdf-doc")}
+                            style={{
+                              padding: "0.4rem 0.9rem",
+                              borderRadius: "6px",
+                              fontSize: "0.85rem",
+                              fontWeight: "700",
+                              border: "none",
+                              cursor: "pointer",
+                              backgroundColor: timetableUploadTab === "pdf-doc" ? "var(--royal-blue)" : "transparent",
+                              color: timetableUploadTab === "pdf-doc" ? "#fff" : "var(--text-muted)",
+                              transition: "all 0.2s"
+                            }}
+                          >
+                            📑 2. PDF or Word (.pdf / .docx)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <a
+                          href="/api/admin/timetable/template-doc"
+                          download="timetable-import-template.docx"
+                          style={{
+                            fontSize: "0.8rem",
+                            padding: "0.35rem 0.75rem",
+                            borderRadius: "6px",
+                            backgroundColor: "var(--bg-input)",
+                            border: "1px solid var(--border-subtle)",
+                            color: "var(--text-main)",
+                            textDecoration: "none",
+                            fontWeight: "600",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.3rem"
+                          }}
+                        >
+                          ⬇ Word Template (.docx)
+                        </a>
+                        <a
+                          href="/api/admin/timetable/template-pdf?type=individual"
+                          download="individual-faculty-timetable-template.pdf"
+                          style={{
+                            fontSize: "0.8rem",
+                            padding: "0.35rem 0.75rem",
+                            borderRadius: "6px",
+                            backgroundColor: "var(--bg-input)",
+                            border: "1px solid var(--border-subtle)",
+                            color: "var(--text-main)",
+                            textDecoration: "none",
+                            fontWeight: "600",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.3rem"
+                          }}
+                        >
+                          ⬇ PDF Template (.pdf)
+                        </a>
+                      </div>
+                    </div>
+
+                    {timetableUploadTab === "excel" ? (
+                      <AdminTimetableExcelUpload
+                        onUploadSuccess={() => {
+                          fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
+                            if (res.success) setAuditLogs(res.logs);
+                          });
+                          fetchData();
+                        }}
+                      />
+                    ) : (
+                      <AdminTimetablePdfUpload
+                        onUploadSuccess={() => {
+                          fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
+                            if (res.success) setAuditLogs(res.logs);
+                          });
+                          fetchData();
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Subtab 2: Bulk User Onboarding */}
+                {(importSubTab === "users" || activeTab === "upload-users") && (
+                  <AdminUserExcelUpload
+                    onUploadSuccess={() => {
+                      fetch("/api/admin/users").then((r) => r.json()).then((res) => {
+                        if (res.success) setUsers(res.users);
+                      });
+                      fetch("/api/admin/audit-logs").then((r) => r.json()).then((res) => {
+                        if (res.success) setAuditLogs(res.logs);
+                      });
+                    }}
+                  />
+                )}
+              </div>
             )}
           </>
         )}
