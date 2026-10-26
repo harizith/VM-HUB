@@ -79,8 +79,14 @@ export default function TeacherDashboardPage() {
             <ClockIcon size={14} /> {timeStr}
             <span style={{ color: "var(--border-subtle)" }}>|</span>
             <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontWeight: "700" }}>
-              {data?.currentDayOrder === "Leave" ? "Leave / Holiday" : `Day Order ${data?.currentDayOrder || "III"}`}
+              {data?.currentDayOrder === "Leave" ? "Today: Leave / Holiday" : `Today: Day Order ${data?.currentDayOrder || "III"}`}
             </span>
+            {data?.tomorrowDayOrder && (
+              <span style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600" }}>
+                {data.tomorrowDayOrder === "Leave" ? "Tomorrow: Leave" : `Tomorrow: Day Order ${data.tomorrowDayOrder}`}
+              </span>
+            )}
+
             <div style={{ marginLeft: "1rem" }}>
               <AcademicClock size={40} subtext="" />
             </div>
@@ -379,10 +385,11 @@ export default function TeacherDashboardPage() {
                 <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "1rem 0" }}>No new notices</div>
               )}
             </div>
-            <button style={{ width: "100%", marginTop: "1rem", padding: "0.6rem", background: "none", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "var(--text-main)", fontSize: "0.8rem", fontWeight: "600", cursor: "pointer" }}>
+            <Link href="/teacher/notices" style={{ display: "block", textAlign: "center", textDecoration: "none", width: "100%", marginTop: "1rem", padding: "0.6rem", background: "none", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "var(--text-main)", fontSize: "0.8rem", fontWeight: "600", cursor: "pointer" }}>
               View All Notices
-            </button>
+            </Link>
           </div>
+
           
         </div>
       </div>

@@ -11,11 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
     }
 
-    const { studentId, classId, dateString, dayOrder, period, subjectCode, status } = await request.json();
-
-    if (!studentId || !classId || !dateString || !period || !subjectCode) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
-    }
+    const body = await request.json();
 
     const email = session.user.email;
     let user = await prisma.user.findUnique({ where: { email } });
@@ -25,13 +21,53 @@ export async function POST(request: Request) {
     }
     const facultyName = user?.name?.trim() || "Unknown";
 
-    // Upsert attendance record
+    // Support bulk marking: { batch: [{ studentId, classId, dateString, dayOrder, period, subjectCode, status }] }
+    if (body.batch && Array.isArray(body.batch)) {
+      const results = [];
+      for (const item of body.batch) {
+        if (!item.studentId || !item.classId || !item.dateString || !item.period || !item.subjectCode) {
+          continue;
+        }
+        const record = await prisma.attendance.upsert({
+          where: {
+            studentId_dateString_period: {
+              studentId: item.studentId,
+              dateString: item.dateString,
+              period: Number(item.period)
+            }
+          },
+          update: {
+            status: item.status
+          },
+          create: {
+            studentId: item.studentId,
+            classId: item.classId,
+            dateString: item.dateString,
+            dayOrder: String(item.dayOrder || "Unknown"),
+            period: Number(item.period),
+            subjectCode: item.subjectCode,
+            facultyName,
+            status: item.status
+          }
+        });
+        results.push(record);
+      }
+      return NextResponse.json({ success: true, count: results.length, data: results });
+    }
+
+    const { studentId, classId, dateString, dayOrder, period, subjectCode, status } = body;
+
+    if (!studentId || !classId || !dateString || !period || !subjectCode) {
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Upsert single attendance record
     const record = await prisma.attendance.upsert({
       where: {
         studentId_dateString_period: {
           studentId,
           dateString,
-          period
+          period: Number(period)
         }
       },
       update: {
@@ -41,8 +77,8 @@ export async function POST(request: Request) {
         studentId,
         classId,
         dateString,
-        dayOrder: dayOrder || "Unknown",
-        period,
+        dayOrder: String(dayOrder || "Unknown"),
+        period: Number(period),
         subjectCode,
         facultyName,
         status

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen, Briefcase } from "lucide-react";
+import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen, Briefcase, Bell } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -32,7 +32,9 @@ export default function HodLayout({ children }: { children: React.ReactNode }) {
     { href: "/hod/department", label: "Department Overview", Icon: Briefcase },
     { href: "/hod/courses", label: "Department Courses", Icon: BookOpen },
     { href: "/hod/faculty", label: "Faculty Directory", Icon: Users },
+    { href: "/hod/notices", label: "Announcements", Icon: Bell },
   ];
+
 
   return (
     <div className="admin-layout">

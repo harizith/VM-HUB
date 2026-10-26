@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen } from "lucide-react";
+import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen, Bell } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -29,9 +29,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   const navItems = [
     { href: "/teacher", label: "Dashboard", Icon: Home },
+    { href: "/teacher/students", label: "Attendance & Students", Icon: Users },
     { href: "/teacher/courses", label: "Course Allocations", Icon: BookOpen },
-    { href: "/teacher/students", label: "Class Directory", Icon: Users },
+    { href: "/teacher/notices", label: "Announcements", Icon: Bell },
   ];
+
 
   return (
     <div className="admin-layout">

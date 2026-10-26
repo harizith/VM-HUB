@@ -7,11 +7,9 @@ export const revalidate = 0;
 // GET /api/admin/notices
 export async function GET() {
   try {
-    const notices: any[] = await prisma.$queryRaw`
-      SELECT id, title, content, category, "postedBy", "createdAt"
-      FROM "Notice"
-      ORDER BY "createdAt" DESC
-    `;
+    const notices = await prisma.notice.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json({ success: true, notices });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -22,21 +20,26 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, content, category } = body;
+    const { title, content, category, audience } = body;
 
     if (!title || !content) {
       return NextResponse.json({ success: false, error: "Title and Content are required" }, { status: 400 });
     }
 
-    const newId = crypto.randomUUID();
     const cat = category || "GENERAL";
+    const aud = audience || "ALL";
 
-    await prisma.$executeRaw`
-      INSERT INTO "Notice" (id, title, content, category, "postedBy", "createdAt")
-      VALUES (${newId}, ${title.trim()}, ${content.trim()}, ${cat}, 'Admin', NOW())
-    `;
+    const newNotice = await prisma.notice.create({
+      data: {
+        title: title.trim(),
+        content: content.trim(),
+        category: cat,
+        audience: aud,
+        postedBy: "Admin",
+      },
+    });
 
-    return NextResponse.json({ success: true, notice: { id: newId, title, content, category: cat, postedBy: "Admin" } });
+    return NextResponse.json({ success: true, notice: newNotice });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -49,9 +52,12 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ success: false, error: "ID required" }, { status: 400 });
 
-    await prisma.$executeRaw`DELETE FROM "Notice" WHERE id = ${id}`;
+    await prisma.notice.delete({
+      where: { id },
+    });
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+

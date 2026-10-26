@@ -39,7 +39,8 @@ export async function GET(request: Request) {
     const email = session.user.email;
 
     let user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      include: { facultyProfile: true }
     });
 
     if (!user) {
@@ -49,26 +50,46 @@ export async function GET(request: Request) {
       }
     }
 
-    const searchStr = user?.name?.trim() || "";
+    // Support dateString param or default to today
+    const { searchParams } = new URL(request.url);
+    const dateParam = searchParams.get("date");
+    const todayString = dateParam || new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    const vmNo = user?.vmNo || user?.facultyProfile?.vmNo;
+    const cleanName = (user?.name || "").replace(/^(Dr\.?|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+    const firstName = cleanName.split(/\s+/)[0] || "";
+
+    const orConditions: any[] = [];
+    if (vmNo && vmNo.trim()) {
+      orConditions.push({ vmsNo: { contains: vmNo.trim() } });
+    }
+    if (firstName && firstName.length >= 3) {
+      orConditions.push({ facultyName: { contains: firstName, mode: "insensitive" } });
+    }
+    if (cleanName && cleanName.length >= 3) {
+      orConditions.push({ facultyName: { contains: cleanName, mode: "insensitive" } });
+    }
 
     const { currentDayOrder } = await getDayOrderInfo();
-    const todayString = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
-    // Fetch the teacher's full timetable (to know which students they can see)
+    // Fetch the teacher's full timetable (to know which students they teach)
     const teacherTimetable = await prisma.timetableEntry.findMany({
-      where: {
-        facultyName: {
-          contains: searchStr,
-          mode: "insensitive"
-        }
-      }
+      where: orConditions.length > 0 ? { OR: orConditions } : {},
+      orderBy: [
+        { dayOrder: "asc" },
+        { period: "asc" }
+      ]
     });
 
-    // Today's specific classes for the teacher
-    const todayClasses = teacherTimetable.filter(t => t.dayOrder === currentDayOrder);
+    // Today's specific classes for the teacher (for active day order)
+    let todayClasses = teacherTimetable.filter(t => t.dayOrder === currentDayOrder);
+    // If today is a holiday / no classes scheduled for currentDayOrder, provide fallback so teacher can still choose a slot
+    if (todayClasses.length === 0 && teacherTimetable.length > 0) {
+      todayClasses = teacherTimetable.slice(0, 8);
+    }
     todayClasses.sort((a, b) => (a.period ?? Number.MAX_SAFE_INTEGER) - (b.period ?? Number.MAX_SAFE_INTEGER));
 
-    const teacherClasses = new Set(teacherTimetable.map(t => t.classId));
+    const teacherClasses = new Set(teacherTimetable.map(t => t.classId).filter(Boolean));
 
     // Fetch all users with role STUDENT
     const allStudents = await prisma.user.findMany({
@@ -83,19 +104,26 @@ export async function GET(request: Request) {
       }
     });
 
-    // Filter students to only include those in the teacher's classes
-    const students = allStudents
+    // Filter students to include those in teacher's classes (or all students if no explicit class restriction)
+    let students = allStudents
       .map(student => ({
          ...student,
          computedClassId: computeStudentClassId(student.studentProfile)
       }))
-      .filter(student => teacherClasses.has(student.computedClassId));
+      .filter(student => teacherClasses.size === 0 || teacherClasses.has(student.computedClassId));
 
-    // Fetch today's attendance records marked by this teacher
+    if (students.length === 0 && allStudents.length > 0) {
+      // Fallback so teachers can always see students
+      students = allStudents.map(student => ({
+        ...student,
+        computedClassId: computeStudentClassId(student.studentProfile)
+      }));
+    }
+
+    // Fetch attendance records for this date
     const attendance = await prisma.attendance.findMany({
       where: {
-        dateString: todayString,
-        facultyName: searchStr
+        dateString: todayString
       }
     });
 

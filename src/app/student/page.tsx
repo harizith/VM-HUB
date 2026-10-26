@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Users, Megaphone, Calendar as CalendarIcon } from "lucide-react";
+
 import OverallTimetable from "@/components/OverallTimetable";
 import Clock from "@/components/Clock";
 
@@ -61,7 +63,19 @@ export default function DashboardPage() {
     <main className="student-main">
       <header className="student-header">
         <div>
-          <div className="student-date">{dateStr} • {data?.currentDayOrder === "Leave" ? "Leave / Holiday" : `Day Order ${data?.currentDayOrder || "III"}`}</div>
+          <div className="student-date" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
+            <span>{dateStr}</span>
+            <span style={{ color: "var(--border-subtle)" }}>•</span>
+            <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontWeight: "700" }}>
+              {data?.currentDayOrder === "Leave" ? "Today: Leave / Holiday" : `Today: Day Order ${data?.currentDayOrder || "III"}`}
+            </span>
+            {data?.tomorrowDayOrder && (
+              <span style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600" }}>
+                {data.tomorrowDayOrder === "Leave" ? "Tomorrow: Leave" : `Tomorrow: Day Order ${data.tomorrowDayOrder}`}
+              </span>
+            )}
+          </div>
+
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <h1>Hey {data?.student?.name ? data.student.name : "Student"}</h1>
             <Clock size={40} subtext="" />
@@ -172,7 +186,13 @@ export default function DashboardPage() {
 
         {/* Notices Card */}
         <div className="student-card premium-card">
-          <h3 style={{ fontSize: "1rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "1rem" }}>Department notices</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: "700", color: "var(--text-main)", margin: 0 }}>Department notices</h3>
+            <Link href="/student/messages" style={{ fontSize: "0.8rem", color: "var(--royal-blue)", textDecoration: "none", fontWeight: "600" }}>
+              View All →
+            </Link>
+          </div>
+
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {data?.notices && data.notices.length > 0 ? (
               data.notices.map((notice: any) => {

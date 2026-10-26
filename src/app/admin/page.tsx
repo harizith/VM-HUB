@@ -61,7 +61,8 @@ interface SubjectItem {
     timeRange: string;
   }[];
 }
-interface NoticeItem { id: string; title: string; content: string; category: string; postedBy: string; createdAt: string; }
+interface NoticeItem { id: string; title: string; content: string; category: string; audience?: string; postedBy: string; createdAt: string; }
+
 interface AuditLogItem {
   id: string;
   action: string;
@@ -382,6 +383,8 @@ export default function AdminPage() {
   const [newNoticeTitle, setNewNoticeTitle] = useState("");
   const [newNoticeContent, setNewNoticeContent] = useState("");
   const [newNoticeCategory, setNewNoticeCategory] = useState("GENERAL");
+  const [newNoticeAudience, setNewNoticeAudience] = useState("ALL");
+
 
   // Apply Theme
   useEffect(() => {
@@ -545,12 +548,24 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/notices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newNoticeTitle, content: newNoticeContent, category: newNoticeCategory }),
+      body: JSON.stringify({ 
+        title: newNoticeTitle, 
+        content: newNoticeContent, 
+        category: newNoticeCategory,
+        audience: newNoticeAudience 
+      }),
     }).then((r) => r.json());
 
-    if (res.success) { setShowNoticeModal(false); setNewNoticeTitle(""); setNewNoticeContent(""); fetchData(); }
+    if (res.success) { 
+      setShowNoticeModal(false); 
+      setNewNoticeTitle(""); 
+      setNewNoticeContent(""); 
+      setNewNoticeAudience("ALL");
+      fetchData(); 
+    }
     else alert("Error: " + res.error);
   };
+
 
   const handleDeleteNotice = async (id: string) => {
     if (!confirm("Delete notice?")) return;
@@ -969,10 +984,18 @@ export default function AdminPage() {
                     <div key={n.id} style={{ backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                       <div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                          <span style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", borderRadius: "4px", fontWeight: "700", backgroundColor: n.category === "URGENT" ? "rgba(239,68,68,0.2)" : n.category === "EXAM" ? "rgba(245,158,11,0.2)" : "rgba(59,130,246,0.2)", color: n.category === "URGENT" ? "#ef4444" : n.category === "EXAM" ? "#d97706" : "var(--royal-blue)" }}>{n.category}</span>
+                          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", borderRadius: "4px", fontWeight: "700", backgroundColor: n.category === "URGENT" ? "rgba(239,68,68,0.2)" : n.category === "EXAM" ? "rgba(245,158,11,0.2)" : "rgba(59,130,246,0.2)", color: n.category === "URGENT" ? "#ef4444" : n.category === "EXAM" ? "#d97706" : "var(--royal-blue)" }}>{n.category}</span>
+                            {n.audience && (
+                              <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem", borderRadius: "4px", backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+                                {n.audience}
+                              </span>
+                            )}
+                          </div>
                           <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{new Date(n.createdAt).toLocaleDateString()}</span>
                         </div>
                         <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "0.5rem" }}>{n.title}</h3>
+
                         <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: "1.5" }}>{n.content}</p>
                       </div>
                       <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end" }}>
@@ -2249,12 +2272,26 @@ export default function AdminPage() {
             <form onSubmit={handleCreateNotice} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <input type="text" placeholder="Notice Title" value={newNoticeTitle} onChange={(e) => setNewNoticeTitle(e.target.value)} required className="premium-input" />
               <textarea placeholder="Notice Body & Details" value={newNoticeContent} onChange={(e) => setNewNoticeContent(e.target.value)} required className="premium-input" style={{ height: "100px", resize: "none" }} />
-              <select value={newNoticeCategory} onChange={(e) => setNewNoticeCategory(e.target.value)} className="premium-input">
-                <option value="GENERAL">GENERAL</option>
-                <option value="EXAM">EXAM</option>
-                <option value="URGENT">URGENT</option>
-              </select>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block" }}>Audience</label>
+                  <select value={newNoticeAudience} onChange={(e) => setNewNoticeAudience(e.target.value)} className="premium-input" style={{ width: "100%" }}>
+                    <option value="ALL">ALL (Students & Faculty)</option>
+                    <option value="STUDENT">STUDENT Only</option>
+                    <option value="FACULTY">FACULTY Only</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block" }}>Category</label>
+                  <select value={newNoticeCategory} onChange={(e) => setNewNoticeCategory(e.target.value)} className="premium-input" style={{ width: "100%" }}>
+                    <option value="GENERAL">GENERAL</option>
+                    <option value="EXAM">EXAM</option>
+                    <option value="URGENT">URGENT</option>
+                  </select>
+                </div>
+              </div>
               <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+
                 <button type="submit" className="btn-sky" style={{ flex: 1 }}>Broadcast Notice</button>
                 <button type="button" onClick={() => setShowNoticeModal(false)} style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "var(--text-main)", padding: "0.75rem 1rem", borderRadius: "8px", border: "none" }}>Cancel</button>
               </div>

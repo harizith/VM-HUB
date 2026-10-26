@@ -121,8 +121,14 @@ export default function HodDashboardPage() {
             <ClockIcon size={14} /> {timeStr}
             <span style={{ color: "var(--border-subtle)" }}>|</span>
             <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontWeight: "700" }}>
-              {data?.currentDayOrder === "Leave" ? "Leave / Holiday" : `Day Order ${data?.currentDayOrder || "III"}`}
+              {data?.currentDayOrder === "Leave" ? "Today: Leave / Holiday" : `Today: Day Order ${data?.currentDayOrder || "III"}`}
             </span>
+            {data?.tomorrowDayOrder && (
+              <span style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600" }}>
+                {data.tomorrowDayOrder === "Leave" ? "Tomorrow: Leave" : `Tomorrow: Day Order ${data.tomorrowDayOrder}`}
+              </span>
+            )}
+
             <div style={{ marginLeft: "1rem" }}>
               <AcademicClock size={40} subtext="" />
             </div>
@@ -358,10 +364,16 @@ export default function HodDashboardPage() {
 
           {/* Notices */}
           <div className="student-card premium-card" style={{ flex: 1 }}>
-            <h3 style={{ fontSize: "1rem", fontWeight: "700", color: "var(--text-main)", margin: "0 0 1rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <Megaphone size={18} /> Announcements
-            </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 1rem 0" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: "700", color: "var(--text-main)", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Megaphone size={18} /> Announcements
+              </h3>
+              <Link href="/hod/notices" style={{ fontSize: "0.8rem", color: "var(--royal-blue)", textDecoration: "none", fontWeight: "600" }}>
+                View All →
+              </Link>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
               {showNoticeForm ? (
                 <div style={{ padding: "1rem", backgroundColor: "var(--bg-card-header)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
                   <input
