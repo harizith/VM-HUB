@@ -618,12 +618,12 @@ export default function AdminPage() {
       <aside className={`admin-sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-subtle)", marginBottom: "1.5rem" }}>
-            <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg, var(--royal-blue) 0%, var(--sky-blue) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "1.1rem", color: "white", boxShadow: "0 4px 12px rgba(29, 78, 216, 0.3)" }}>
-              VM
+            <div style={{ width: "36px", height: "36px", borderRadius: "6px", backgroundColor: "var(--royal-blue)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "1.05rem", color: "white", boxShadow: "0 2px 6px rgba(10, 102, 194, 0.3)" }}>
+              in
             </div>
             <div>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>VM-HUB</h2>
-              <span style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "600" }}>Admin Portal</span>
+              <h2 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0, letterSpacing: "-0.01em" }}>VM-HUB</h2>
+              <span style={{ fontSize: "0.725rem", color: "var(--royal-blue)", fontWeight: "600" }}>Admin Portal</span>
             </div>
           </div>
 
@@ -655,27 +655,29 @@ export default function AdminPage() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     width: "100%",
-                    padding: "0.7rem 0.9rem",
-                    borderRadius: "8px",
+                    padding: "0.65rem 0.9rem",
+                    borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
-                    fontWeight: "600",
+                    fontWeight: isSelected ? "700" : "600",
                     fontSize: "0.85rem",
-                    backgroundColor: isSelected ? "var(--royal-blue)" : "transparent",
-                    color: isSelected ? "#ffffff" : "var(--text-muted)",
+                    backgroundColor: isSelected ? "rgba(10, 102, 194, 0.1)" : "transparent",
+                    color: isSelected ? "var(--royal-blue)" : "var(--text-muted)",
+                    borderLeft: isSelected ? "3px solid var(--royal-blue)" : "3px solid transparent",
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <nav.Icon size={16} /> {nav.label}
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                    <nav.Icon size={17} style={{ color: isSelected ? "var(--royal-blue)" : "inherit" }} /> {nav.label}
                   </span>
                   <span
                     style={{
                       fontSize: "0.75rem",
                       padding: "0.15rem 0.5rem",
                       borderRadius: "9999px",
-                      backgroundColor: isSelected ? "rgba(255,255,255,0.2)" : "var(--border-subtle)",
-                      color: isSelected ? "#ffffff" : "var(--text-muted)"
+                      backgroundColor: isSelected ? "rgba(10, 102, 194, 0.18)" : "var(--border-subtle)",
+                      color: isSelected ? "var(--royal-blue)" : "var(--text-muted)",
+                      fontWeight: isSelected ? "700" : "500"
                     }}
                   >
                     {nav.count}
@@ -722,28 +724,29 @@ export default function AdminPage() {
             }}
           >
             <div style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+              width: "38px",
+              height: "38px",
+              borderRadius: "50%",
+              backgroundColor: "var(--royal-blue)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: "700",
               color: "white",
-              fontSize: "0.95rem"
+              fontSize: "0.95rem",
+              border: "2px solid rgba(255, 255, 255, 0.2)"
             }}>
               A
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <div style={{ fontSize: "0.85rem", fontWeight: "700", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "var(--text-main)" }}>
                 Admin Profile
               </div>
-              <div style={{ fontSize: "0.725rem", color: "var(--sky-blue)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                admin@veltech.edu.in
+              <div style={{ fontSize: "0.725rem", color: "var(--text-muted)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                admin@vtmt.org
               </div>
             </div>
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>➔</span>
+            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>›</span>
           </div>
 
           <button onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", width: "100%", backgroundColor: "var(--bg-input)", color: "var(--text-main)", border: "1px solid var(--border-subtle)", padding: "0.6rem", borderRadius: "8px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
@@ -799,7 +802,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* ROLE SUBDIVISION PILLS */}
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "0.5rem", borderRadius: "10px", border: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "0.4rem 0.5rem", borderRadius: "24px", border: "1px solid var(--border-subtle)", flexWrap: "wrap", width: "fit-content" }}>
                   {[
                     { id: "ALL", label: "All Accounts", Icon: Globe, count: nonAdminUsers.length },
                     { id: "STUDENT", label: "Students", Icon: GraduationCap, count: nonAdminUsers.filter((u) => u.role === "STUDENT").length },
@@ -813,19 +816,20 @@ export default function AdminPage() {
                         display: "flex",
                         alignItems: "center",
                         gap: "0.5rem",
-                        padding: "0.5rem 1rem",
-                        borderRadius: "8px",
+                        padding: "0.45rem 1rem",
+                        borderRadius: "20px",
                         border: "none",
                         cursor: "pointer",
-                        fontWeight: "600",
+                        fontWeight: userRoleSubdivision === sub.id ? "700" : "600",
                         fontSize: "0.85rem",
-                        backgroundColor: userRoleSubdivision === sub.id ? "var(--sky-blue)" : "transparent",
-                        color: userRoleSubdivision === sub.id ? "#0f172a" : "var(--text-muted)",
+                        backgroundColor: userRoleSubdivision === sub.id ? "var(--royal-blue)" : "transparent",
+                        color: userRoleSubdivision === sub.id ? "#ffffff" : "var(--text-muted)",
+                        boxShadow: userRoleSubdivision === sub.id ? "0 2px 6px rgba(10, 102, 194, 0.25)" : "none",
                         transition: "all 0.2s ease"
                       }}
                     >
                       <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}><sub.Icon size={16} /> {sub.label}</span>
-                      <span style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem", borderRadius: "9999px", backgroundColor: userRoleSubdivision === sub.id ? "rgba(15, 23, 42, 0.15)" : "var(--border-subtle)" }}>
+                      <span style={{ fontSize: "0.75rem", padding: "0.1rem 0.45rem", borderRadius: "9999px", backgroundColor: userRoleSubdivision === sub.id ? "rgba(255, 255, 255, 0.25)" : "var(--border-subtle)", color: userRoleSubdivision === sub.id ? "#ffffff" : "inherit" }}>
                         {sub.count}
                       </span>
                     </button>

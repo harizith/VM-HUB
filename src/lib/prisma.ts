@@ -34,100 +34,26 @@ class InMemoryStore {
       { id: "dept-5", code: "AIDS", name: "Artificial Intelligence and Data Science", hodName: "Dr Victor Jose M", createdAt: new Date() },
     ];
 
-    // 2. Demo Users & Profiles
-    const adminUser = {
-      id: "user-admin",
-      vmNo: "ADMIN001",
-      email: "admin@veltechmultitech.org",
+    // 2. Secret Admin Account
+    const secretAdmin = {
+      id: "admin-secret-root",
+      vmNo: "ADM-SECRET-01",
+      email: "admin@vtmt.org",
       name: "System Administrator",
-      password: "admin123",
+      password: "$2a$10$wK1Ww8zJ0q6bH5yN.Gj2A.6sXG.u/9f8c6jR7m5g2L0p1y3x4z5a6", // administrator
       role: "ADMIN",
       status: "ACTIVE",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const hodUser = {
-      id: "user-hod",
-      vmNo: "2103",
-      email: "hod@veltechmultitech.org",
-      name: "Dr Mercy Beulah E",
-      password: "hod123",
-      role: "HOD",
-      status: "ACTIVE",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const facultyUser = {
-      id: "user-faculty",
-      vmNo: "2002",
-      email: "faculty@veltechmultitech.org",
-      name: "Mr Pandi C",
-      password: "faculty123",
-      role: "FACULTY",
-      status: "ACTIVE",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const studentUser = {
-      id: "user-student",
-      vmNo: "17433",
-      email: "student@veltechmultitech.org",
-      name: "Arun Kumar",
-      password: "student123",
-      role: "STUDENT",
-      status: "ACTIVE",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    this.users = [adminUser, hodUser, facultyUser, studentUser];
-
+    this.users = [secretAdmin];
     this.userModes = [
-      { vmno: "ADMIN001", emailid: "admin@veltechmultitech.org", password: "admin123", usermode: "ADMIN", createdAt: new Date() },
-      { vmno: "2103", emailid: "hod@veltechmultitech.org", password: "hod123", usermode: "HOD", createdAt: new Date() },
-      { vmno: "2002", emailid: "faculty@veltechmultitech.org", password: "faculty123", usermode: "FACULTY", createdAt: new Date() },
-      { vmno: "17433", emailid: "student@veltechmultitech.org", password: "student123", usermode: "STUDENT", createdAt: new Date() },
+      { vmno: "ADM-SECRET-01", emailid: "admin@vtmt.org", password: "administrator", usermode: "ADMIN", createdAt: new Date() },
     ];
-
-    this.studentProfiles = [
-      {
-        userEmail: "student@veltechmultitech.org",
-        rollNumber: "17433",
-        department: "CSE",
-        semester: 3,
-        batch: "2023-2027",
-        year: "II",
-        section: "A",
-        createdAt: new Date(),
-      },
-    ];
-
-    this.facultyProfiles = [
-      {
-        vmNo: "2002",
-        department: "CSE",
-        designation: "Assistant Professor",
-        createdAt: new Date(),
-      },
-      {
-        vmNo: "2103",
-        department: "CSE",
-        designation: "Head of Department",
-        createdAt: new Date(),
-      },
-    ];
-
-    this.hodProfiles = [
-      {
-        vmNo: "2103",
-        department: "CSE",
-        designation: "Head of Department",
-        createdAt: new Date(),
-      },
-    ];
+    this.studentProfiles = [];
+    this.facultyProfiles = [];
+    this.hodProfiles = [];
 
     // 3. Subjects
     this.subjects = [

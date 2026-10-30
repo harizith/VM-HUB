@@ -61,29 +61,30 @@ export default function DashboardPage() {
 
   return (
     <main className="student-main">
-      <header className="student-header">
+      <header className="student-header" style={{ alignItems: "center" }}>
         <div>
-          <div className="student-date" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
-            <span>{dateStr}</span>
+          <div className="student-date" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: "600" }}>{dateStr}</span>
             <span style={{ color: "var(--border-subtle)" }}>•</span>
-            <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", color: "var(--sky-blue)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontWeight: "700" }}>
-              {data?.currentDayOrder === "Leave" ? "Today: Leave / Holiday" : `Today: Day Order ${data?.currentDayOrder || "III"}`}
+            <span style={{ backgroundColor: "rgba(10, 102, 194, 0.1)", color: "var(--royal-blue)", padding: "0.15rem 0.6rem", borderRadius: "12px", fontWeight: "700", fontSize: "0.75rem", border: "1px solid rgba(10, 102, 194, 0.2)" }}>
+              {data?.currentDayOrder === "Leave" ? "Holiday / Leave" : `Day Order ${data?.currentDayOrder || "III"}`}
             </span>
             {data?.tomorrowDayOrder && (
-              <span style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", padding: "0.1rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600" }}>
-                {data.tomorrowDayOrder === "Leave" ? "Tomorrow: Leave" : `Tomorrow: Day Order ${data.tomorrowDayOrder}`}
+              <span style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", padding: "0.15rem 0.6rem", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "600" }}>
+                {data.tomorrowDayOrder === "Leave" ? "Tomorrow: Leave" : `Tomorrow: Day ${data.tomorrowDayOrder}`}
               </span>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <h1>Hey {data?.student?.name ? data.student.name : "Student"}</h1>
-            <Clock size={40} subtext="" />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <h1 style={{ fontSize: "1.75rem", fontWeight: "700", letterSpacing: "-0.02em" }}>
+              Welcome, {data?.student?.name ? data.student.name.split(" ")[0] : "Student"}
+            </h1>
           </div>
         </div>
-        <div className="student-course-info">
-          <strong>{data?.student?.department || "Department not set"}</strong>
-          Semester {data?.student?.semester ?? "—"} - Section {data?.student?.section || "—"}
+        <div className="student-course-info" style={{ textAlign: "right" }}>
+          <strong style={{ fontSize: "0.95rem", color: "var(--text-main)" }}>{data?.student?.department || "Department"}</strong>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Semester {data?.student?.semester ?? "—"} • Section {data?.student?.section || "—"}</span>
         </div>
       </header>
 
@@ -125,9 +126,9 @@ export default function DashboardPage() {
             )}
           </div>
           {upNext && (
-            <button style={{ backgroundColor: "rgba(217, 119, 6, 0.1)", color: "#d97706", border: "none", padding: "0.6rem 1rem", borderRadius: "8px", fontWeight: "700", fontSize: "0.85rem", alignSelf: "flex-start" }}>
+            <span style={{ backgroundColor: "rgba(10, 102, 194, 0.1)", color: "var(--royal-blue)", padding: "0.35rem 0.85rem", borderRadius: "16px", fontWeight: "700", fontSize: "0.75rem", alignSelf: "flex-start", border: "1px solid rgba(10, 102, 194, 0.2)" }}>
               Upcoming
-            </button>
+            </span>
           )}
         </div>
       </div>
@@ -223,12 +224,18 @@ export default function DashboardPage() {
                 }
 
                 return (
-                  <div key={notice.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid var(--border-subtle)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                      <span style={{ backgroundColor: badgeColor, color: textColor, padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "700" }}>{notice.category || "GENERAL"}</span>
-                      <span style={{ fontSize: "0.9rem", fontWeight: "600", color: "var(--text-main)" }}>{notice.title}</span>
+                  <div key={notice.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", paddingBottom: "0.75rem", borderBottom: "1px solid var(--border-subtle)", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ backgroundColor: badgeColor, color: textColor, padding: "0.15rem 0.5rem", borderRadius: "4px", fontSize: "0.65rem", fontWeight: "700" }}>{notice.category || "GENERAL"}</span>
+                        {notice.audience === "SPECIFIC_STUDENT" && (
+                          <span style={{ backgroundColor: "rgba(168, 85, 247, 0.15)", color: "#a855f7", padding: "0.15rem 0.5rem", borderRadius: "4px", fontSize: "0.65rem", fontWeight: "700" }}>For You</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "var(--text-main)" }}>{notice.title}</span>
+                      <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-muted)", lineClamp: 2, display: "-webkit-box", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{notice.content}</p>
                     </div>
-                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{timeStr}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{timeStr}</span>
                   </div>
                 );
               })

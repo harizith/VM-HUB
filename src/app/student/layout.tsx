@@ -58,33 +58,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <div
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, var(--royal-blue) 0%, var(--sky-blue) 100%)",
+                width: "36px",
+                height: "36px",
+                borderRadius: "6px",
+                backgroundColor: "var(--royal-blue)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: "800",
-                fontSize: "1.1rem",
+                fontSize: "1.05rem",
                 color: "white",
-                boxShadow: "0 4px 12px rgba(29, 78, 216, 0.3)",
+                boxShadow: "0 2px 6px rgba(10, 102, 194, 0.3)",
               }}
             >
-              VM
+              in
             </div>
             <div>
               <h2
                 style={{
-                  fontSize: "1.1rem",
+                  fontSize: "1.05rem",
                   fontWeight: "700",
                   margin: 0,
-                  fontFamily: "var(--font-serif, serif)",
+                  letterSpacing: "-0.01em",
                 }}
               >
                 VM-HUB
               </h2>
-              <span style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "600" }}>
+              <span style={{ fontSize: "0.725rem", color: "var(--royal-blue)", fontWeight: "600" }}>
                 Student Portal
               </span>
             </div>
@@ -104,20 +104,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     justifyContent: "space-between",
                     alignItems: "center",
                     width: "100%",
-                    padding: "0.7rem 0.9rem",
-                    borderRadius: "8px",
+                    padding: "0.65rem 0.9rem",
+                    borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
-                    fontWeight: "600",
+                    fontWeight: isActive ? "700" : "600",
                     fontSize: "0.85rem",
-                    backgroundColor: isActive ? "var(--royal-blue)" : "transparent",
-                    color: isActive ? "#ffffff" : "var(--text-muted)",
+                    backgroundColor: isActive ? "rgba(10, 102, 194, 0.1)" : "transparent",
+                    color: isActive ? "var(--royal-blue)" : "var(--text-muted)",
+                    borderLeft: isActive ? "3px solid var(--royal-blue)" : "3px solid transparent",
                     transition: "all 0.2s ease",
                     textDecoration: "none",
                   }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <nav.Icon size={16} /> {nav.label}
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                    <nav.Icon size={17} style={{ color: isActive ? "var(--royal-blue)" : "inherit" }} /> {nav.label}
                   </span>
                   {isActive && (
                     <span
@@ -125,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         width: "6px",
                         height: "6px",
                         borderRadius: "50%",
-                        backgroundColor: "#ffffff",
+                        backgroundColor: "var(--royal-blue)",
                       }}
                     />
                   )}
@@ -170,16 +171,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <div
               style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, var(--royal-blue) 0%, var(--sky-blue) 100%)",
+                width: "38px",
+                height: "38px",
+                borderRadius: "50%",
+                backgroundColor: "var(--royal-blue)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: "700",
                 color: "white",
                 fontSize: "0.95rem",
+                border: "2px solid rgba(255, 255, 255, 0.2)",
               }}
             >
               {studentInfo?.name ? studentInfo.name.charAt(0) : "S"}
@@ -188,10 +190,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div
                 style={{
                   fontSize: "0.85rem",
-                  fontWeight: "700",
+                  fontWeight: "600",
                   textOverflow: "ellipsis",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
+                  color: "var(--text-main)",
                 }}
               >
                 {studentInfo?.name || "Student Profile"}
@@ -199,7 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div
                 style={{
                   fontSize: "0.725rem",
-                  color: "var(--sky-blue)",
+                  color: "var(--text-muted)",
                   textOverflow: "ellipsis",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
@@ -208,7 +211,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {studentInfo?.registerNo || studentInfo?.department || "Student"}
               </div>
             </div>
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>➔</span>
+            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>›</span>
           </div>
 
           {/* Theme Switcher */}

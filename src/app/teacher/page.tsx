@@ -197,7 +197,7 @@ export default function TeacherDashboardPage() {
             </div>
 
             {/* Day Order Selector Pills */}
-            <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
               {["I", "II", "III", "IV", "V"].map((doStr) => {
                 const isSelected = selectedTimelineDay === doStr;
                 const isToday = data?.currentDayOrder === doStr;
@@ -206,24 +206,25 @@ export default function TeacherDashboardPage() {
                     key={doStr}
                     onClick={() => setSelectedTimelineDay(doStr)}
                     style={{
-                      padding: "0.4rem 0.85rem",
-                      borderRadius: "8px",
+                      padding: "0.45rem 1rem",
+                      borderRadius: "20px",
                       border: isSelected ? "1px solid var(--royal-blue)" : "1px solid var(--border-subtle)",
-                      backgroundColor: isSelected ? "var(--royal-blue)" : "var(--bg-input)",
+                      backgroundColor: isSelected ? "var(--royal-blue)" : "var(--bg-card)",
                       color: isSelected ? "#fff" : "var(--text-main)",
-                      fontWeight: 700,
-                      fontSize: "0.8rem",
+                      fontWeight: isSelected ? 700 : 600,
+                      fontSize: "0.825rem",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
                       gap: "0.4rem",
                       whiteSpace: "nowrap",
+                      boxShadow: isSelected ? "0 2px 6px rgba(10, 102, 194, 0.25)" : "none",
                       transition: "all 0.15s ease"
                     }}
                   >
                     <span>Day {doStr}</span>
                     {isToday && (
-                      <span style={{ fontSize: "0.6rem", padding: "0.1rem 0.35rem", borderRadius: "4px", backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(34,197,94,0.15)", color: isSelected ? "#fff" : "#22c55e", fontWeight: 800 }}>
+                      <span style={{ fontSize: "0.65rem", padding: "0.1rem 0.4rem", borderRadius: "10px", backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(34,197,94,0.15)", color: isSelected ? "#fff" : "#16a34a", fontWeight: 700 }}>
                         TODAY
                       </span>
                     )}

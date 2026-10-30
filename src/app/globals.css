@@ -2,43 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Theme Color Tokens === */
-:root {
-  /* Default Theme Tokens (Dark Obsidian Mode) */
-  --royal-blue: #1d4ed8;
-  --royal-blue-hover: #1e40af;
-  --sky-blue: #38bdf8;
-  --sky-blue-hover: #0284c7;
-  --white-blue: #f0f7ff;
+/* === Theme Color Tokens (LinkedIn Professional Modern) === */
+:root, [data-theme="light"] {
+  /* LinkedIn Signature Blue */
+  --royal-blue: #0a66c2;
+  --royal-blue-hover: #004182;
+  --sky-blue: #70b5f9;
+  --sky-blue-hover: #378fe9;
+  --white-blue: #f3f2ef;
   
-  --bg-page: #090d16;        /* Rich Obsidian Black */
-  --bg-card: #0f172a;        /* Deep Slate Surface */
-  --bg-card-header: #1e293b; /* Subtle Card Header */
-  --bg-input: #0f172a;
+  /* LinkedIn Light Canvas (Default) */
+  --bg-page: #f3f2f0;           /* LinkedIn Neutral Canvas */
+  --bg-card: #ffffff;           /* Clean White Cards */
+  --bg-card-header: #f8fafc;
+  --bg-input: #edf3f8;          /* LinkedIn Search/Input Tint */
+  --bg-hover: #ebebeb;
   
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --border-active: rgba(56, 189, 248, 0.4);
+  --text-main: #181818;         /* High Contrast Charcoal */
+  --text-muted: #56687a;        /* LinkedIn Gray Subtitle */
+  --border-subtle: #e0e0e0;     /* LinkedIn Subtle Divider */
+  --border-active: #0a66c2;     /* LinkedIn Active Blue */
   
-  --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --shadow-card: 0 0 0 1px rgba(140, 140, 140, 0.2), 0 2px 3px rgba(0, 0, 0, 0.05);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
 }
 
-/* Light Theme Overrides (White-Blue Theme) */
-[data-theme="light"] {
-  --bg-page: #f0f7ff;        /* Ice-white-blue background */
-  --bg-card: #ffffff;        /* Pure white cards */
-  --bg-card-header: #e0f2fe; /* Light sky-blue header accent */
-  --bg-input: #f8fafc;
+/* Dark Theme Overrides (LinkedIn Dark Professional) */
+[data-theme="dark"] {
+  --bg-page: #1b1f23;           /* LinkedIn Dark Body */
+  --bg-card: #24292e;           /* LinkedIn Dark Card/Surface */
+  --bg-card-header: #2f363d;
+  --bg-input: #1b1f23;
+  --bg-hover: #32383f;
   
-  --text-main: #0f172a;      /* Deep navy black text */
-  --text-muted: #475569;
-  --border-subtle: rgba(30, 64, 175, 0.12);
-  --border-active: #1d4ed8;
+  --text-main: #ffffff;
+  --text-muted: #8b949e;
+  --border-subtle: #30363d;
+  --border-active: #0a66c2;
   
-  --shadow-card: 0 10px 25px -5px rgba(30, 64, 175, 0.08);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -57,55 +60,67 @@ html, body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Base Buttons & Forms */
+/* Base Buttons & Forms - LinkedIn Style */
 .btn-royal {
   background-color: var(--royal-blue);
   color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.55rem 1.25rem;
+  border-radius: 24px;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .btn-royal:hover {
   background-color: var(--royal-blue-hover);
-  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .btn-sky {
-  background-color: var(--sky-blue);
-  color: #0f172a;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  background-color: transparent;
+  color: var(--royal-blue);
+  border: 1px solid var(--royal-blue);
+  padding: 0.55rem 1.25rem;
+  border-radius: 24px;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .btn-sky:hover {
-  background-color: var(--sky-blue-hover);
-  color: white;
+  background-color: rgba(10, 102, 194, 0.08);
+  border-color: var(--royal-blue-hover);
+  color: var(--royal-blue-hover);
 }
 
 .premium-input {
   width: 100%;
-  padding: 0.8rem 1rem;
+  padding: 0.65rem 0.95rem;
   background-color: var(--bg-input);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text-main);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   transition: all 0.2s ease;
 }
 
 .premium-input:focus {
   outline: none;
-  border-color: var(--border-active);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  border-color: var(--royal-blue);
+  box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.2);
+  background-color: var(--bg-card);
 }
 
 .premium-input::placeholder {
@@ -597,8 +612,8 @@ html, body {
 
 .student-nav-item {
   width: 100%;
-  padding: 0.7rem 0.9rem;
-  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -613,14 +628,15 @@ html, body {
 }
 
 .student-nav-item:hover {
-  background-color: var(--border-subtle);
-  color: var(--text-main);
+  background-color: rgba(10, 102, 194, 0.08);
+  color: var(--royal-blue);
 }
 
 .student-nav-item.active {
-  background-color: var(--royal-blue);
-  color: white;
-  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.4);
+  background-color: rgba(10, 102, 194, 0.12);
+  color: var(--royal-blue);
+  font-weight: 700;
+  border-left: 3px solid var(--royal-blue);
 }
 
 .student-nav-bottom {
@@ -678,33 +694,39 @@ html, body {
 
 .student-course-info strong {
   display: block;
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-main);
+  font-weight: 600;
 }
 
 .student-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 20px;
+  border-radius: 10px;
   box-shadow: var(--shadow-card);
-  padding: 1.5rem;
-  transition: all 0.3s ease;
+  padding: 1.25rem 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.student-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .student-banner {
-  background-color: var(--royal-blue);
+  background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
   color: white;
-  border-radius: 24px;
-  padding: 2rem;
+  border-radius: 12px;
+  padding: 1.75rem 2rem;
   display: flex;
   align-items: center;
   gap: 2rem;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 25px -5px rgba(29, 78, 216, 0.3);
+  box-shadow: 0 4px 14px rgba(10, 102, 194, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Add a subtle highlight in the background of the banner */
+/* Subtle LinkedIn pattern in banner */
 .student-banner::after {
   content: "";
   position: absolute;
@@ -712,16 +734,16 @@ html, body {
   right: -10%;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%);
+  background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%);
   border-radius: 50%;
   pointer-events: none;
 }
 
 .student-timetable-scroll {
   display: flex;
-  gap: 1rem;
+  gap: 0.85rem;
   overflow-x: auto;
-  padding-bottom: 1rem;
+  padding-bottom: 0.75rem;
   scrollbar-width: thin;
   scrollbar-color: var(--border-subtle) transparent;
 }
@@ -742,49 +764,58 @@ html, body {
 .period-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 1.25rem;
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
   min-width: 140px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s, background-color 0.3s ease, border 0.3s ease;
+  transition: transform 0.2s, background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .period-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-active);
+  border-color: var(--royal-blue);
+  box-shadow: 0 4px 10px rgba(10, 102, 194, 0.12);
 }
 
 .period-card.active {
   background-color: var(--royal-blue);
   color: white;
   border-color: var(--royal-blue);
+  box-shadow: 0 4px 12px rgba(10, 102, 194, 0.3);
 }
 
 .period-card.active .period-time,
 .period-card.active .period-number {
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.85);
 }
 
 .period-number {
-  font-size: 0.75rem;
+  font-size: 0.725rem;
   font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .period-time {
-  font-size: 0.8rem;
+  font-size: 0.775rem;
   color: var(--text-muted);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .period-subject {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   margin-top: auto;
+  color: var(--text-main);
+}
+
+.period-card.active .period-subject {
+  color: #ffffff;
 }
 
 .attendance-ring {

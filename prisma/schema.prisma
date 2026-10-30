@@ -101,17 +101,20 @@ model Subject {
 }
 
 model Notice {
-  id        String   @id @default(uuid())
-  title     String
-  content   String
-  category  String   @default("GENERAL") // GENERAL, URGENT, EXAM
-  audience  String   @default("ALL") // ALL, STUDENT, FACULTY
-  postedBy  String   @default("Admin")
-  authorId  String?
-  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  title           String
+  content         String
+  category        String   @default("GENERAL") // GENERAL, URGENT, EXAM
+  audience        String   @default("ALL") // ALL, STUDENT, FACULTY, SPECIFIC_STUDENT
+  targetStudentId String?  // Specific student ID / Roll No / Email
+  department      String?  // Optional department filter
+  postedBy        String   @default("Admin")
+  authorId        String?
+  author          User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
 
   @@index([postedBy])
+  @@index([targetStudentId])
 }
 
 model SystemSetting {

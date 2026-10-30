@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiHome, FiCalendar, FiBell, FiUser, FiLogOut, FiMessageSquare, FiAlertCircle, FiInfo } from "react-icons/fi";
-import { Megaphone, ArrowLeft, Plus } from "lucide-react";
+import { Megaphone, ArrowLeft, Plus, Users, Check, Search, Filter } from "lucide-react";
 
 interface Notice {
   id: string;
@@ -11,8 +11,19 @@ interface Notice {
   content: string;
   category: string;
   audience?: string;
+  targetStudentId?: string | null;
   postedBy: string;
   createdAt: string;
+}
+
+interface StudentOption {
+  id: string;
+  name: string;
+  email: string;
+  vmNo?: string | null;
+  rollNumber?: string;
+  department?: string;
+  classId?: string;
 }
 
 export default function HodNoticesPage() {
@@ -24,8 +35,11 @@ export default function HodNoticesPage() {
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState("");
   const [noticeContent, setNoticeContent] = useState("");
-  const [noticeAudience, setNoticeAudience] = useState("ALL");
+  const [noticeAudience, setNoticeAudience] = useState<"ALL" | "FACULTY" | "STUDENT" | "SPECIFIC_STUDENT">("ALL");
   const [noticeCategory, setNoticeCategory] = useState("GENERAL");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [studentsList, setStudentsList] = useState<StudentOption[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
   const [postingNotice, setPostingNotice] = useState(false);
 
   const fetchNotices = () => {
@@ -46,13 +60,40 @@ export default function HodNoticesPage() {
       });
   };
 
+  const fetchStudents = () => {
+    fetch("/api/hod/students")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setStudentsList(json.data);
+        }
+      })
+      .catch((err) => console.error("Could not fetch students list", err));
+  };
+
   useEffect(() => {
     fetchNotices();
+    fetchStudents();
   }, []);
+
+  const toggleStudentSelection = (val: string) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(val) ? prev.filter((id) => id !== val) : [...prev, val]
+    );
+  };
 
   const handlePostNotice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noticeTitle.trim() || !noticeContent.trim()) return;
+    if (!noticeTitle.trim() || !noticeContent.trim()) {
+      alert("Please enter title and content.");
+      return;
+    }
+
+    if (noticeAudience === "SPECIFIC_STUDENT" && selectedStudentIds.length === 0) {
+      alert("Please select at least one student from the list.");
+      return;
+    }
+
     setPostingNotice(true);
     try {
       const res = await fetch("/api/hod/notices", {
@@ -62,15 +103,18 @@ export default function HodNoticesPage() {
           title: noticeTitle,
           content: noticeContent,
           audience: noticeAudience,
-          category: noticeCategory
+          category: noticeCategory,
+          targetStudentIds: selectedStudentIds
         })
       });
       const resData = await res.json();
       if (resData.success) {
         setNoticeTitle("");
         setNoticeContent("");
+        setSelectedStudentIds([]);
         setShowNoticeForm(false);
         fetchNotices();
+        alert("Announcement broadcasted successfully!");
       } else {
         alert(resData.error || "Failed to post notice");
       }
@@ -106,6 +150,17 @@ export default function HodNoticesPage() {
     }
   };
 
+  const filteredStudents = studentsList.filter((s) => {
+    const q = studentSearch.toLowerCase();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      (s.rollNumber && s.rollNumber.toLowerCase().includes(q)) ||
+      (s.vmNo && s.vmNo.toLowerCase().includes(q)) ||
+      (s.classId && s.classId.toLowerCase().includes(q)) ||
+      (s.department && s.department.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <main className="student-main">
       <header className="student-header" style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
@@ -118,7 +173,7 @@ export default function HodNoticesPage() {
           <h1 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Megaphone size={24} style={{ color: "var(--royal-blue)" }} /> Department & College Announcements
           </h1>
-          <p className="student-subtitle">Publish circulars to students, faculty, or view system wide notices.</p>
+          <p className="student-subtitle">Broadcast circulars to all staff & students, faculty only, students only, or specific individual students.</p>
         </div>
 
         <button 
@@ -135,38 +190,52 @@ export default function HodNoticesPage() {
         <div className="student-card premium-card" style={{ marginBottom: "2rem", border: "1px solid var(--royal-blue)" }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem", color: "var(--text-main)" }}>Publish Announcement</h3>
           <form onSubmit={handlePostNotice} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <input
-              type="text"
-              placeholder="Announcement Title (e.g. Model Exam Schedule 2026)"
-              value={noticeTitle}
-              onChange={(e) => setNoticeTitle(e.target.value)}
-              required
-              className="premium-input"
-            />
-            <textarea
-              placeholder="Announcement details, guidelines, or venue details..."
-              value={noticeContent}
-              onChange={(e) => setNoticeContent(e.target.value)}
-              required
-              className="premium-input"
-              style={{ minHeight: "100px", resize: "vertical" }}
-            />
+            <div>
+              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem", display: "block", fontWeight: 600 }}>
+                Announcement Heading / Title
+              </label>
+              <input
+                type="text"
+                placeholder="Announcement Title (e.g. End Semester Exam Guidelines 2026)"
+                value={noticeTitle}
+                onChange={(e) => setNoticeTitle(e.target.value)}
+                required
+                className="premium-input"
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem", display: "block", fontWeight: 600 }}>
+                Announcement Details
+              </label>
+              <textarea
+                placeholder="Announcement details, guidelines, venue details, or instructions..."
+                value={noticeContent}
+                onChange={(e) => setNoticeContent(e.target.value)}
+                required
+                className="premium-input"
+                style={{ minHeight: "100px", resize: "vertical", width: "100%" }}
+              />
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <div>
-                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block" }}>Audience</label>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block", fontWeight: 600 }}>Audience</label>
                 <select
                   value={noticeAudience}
-                  onChange={(e) => setNoticeAudience(e.target.value)}
+                  onChange={(e) => setNoticeAudience(e.target.value as any)}
                   className="premium-input"
                   style={{ width: "100%" }}
                 >
-                  <option value="ALL">All (Students & Faculty)</option>
+                  <option value="ALL">All (Teachers & Students)</option>
+                  <option value="FACULTY">Teachers Only (Faculty)</option>
                   <option value="STUDENT">Students Only</option>
-                  <option value="FACULTY">Faculty Only</option>
+                  <option value="SPECIFIC_STUDENT">Specific Students (Select in options below)</option>
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block" }}>Category</label>
+                <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block", fontWeight: 600 }}>Category</label>
                 <select
                   value={noticeCategory}
                   onChange={(e) => setNoticeCategory(e.target.value)}
@@ -179,6 +248,98 @@ export default function HodNoticesPage() {
                 </select>
               </div>
             </div>
+
+            {/* Specific Student Selector */}
+            {noticeAudience === "SPECIFIC_STUDENT" && (
+              <div style={{ border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "1rem", backgroundColor: "var(--bg-input)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-main)" }}>
+                    Select Specific Students ({selectedStudentIds.length} selected)
+                  </span>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedStudentIds(filteredStudents.map(s => s.rollNumber || s.vmNo || s.email))}
+                      style={{ fontSize: "0.75rem", background: "transparent", border: "none", color: "var(--sky-blue)", cursor: "pointer", fontWeight: 600 }}
+                    >
+                      Select All Filtered
+                    </button>
+                    <span style={{ color: "var(--border-subtle)" }}>•</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedStudentIds([])}
+                      style={{ fontSize: "0.75rem", background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontWeight: 600 }}
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ position: "relative", marginBottom: "0.75rem" }}>
+                  <Search size={16} style={{ position: "absolute", left: "10px", top: "10px", color: "var(--text-muted)" }} />
+                  <input
+                    type="text"
+                    placeholder="Search students by name, roll no, VM no, or class..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="premium-input"
+                    style={{ paddingLeft: "2.25rem", width: "100%", fontSize: "0.85rem" }}
+                  />
+                </div>
+
+                <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.4rem", paddingRight: "0.25rem" }}>
+                  {filteredStudents.length === 0 ? (
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", textAlign: "center", padding: "1rem" }}>
+                      No students found matching your search.
+                    </div>
+                  ) : (
+                    filteredStudents.map((s) => {
+                      const idVal = s.rollNumber || s.vmNo || s.email;
+                      const isSelected = selectedStudentIds.includes(idVal);
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => toggleStudentSelection(idVal)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "0.5rem 0.75rem",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            backgroundColor: isSelected ? "rgba(56, 189, 248, 0.15)" : "var(--bg-card)",
+                            border: isSelected ? "1px solid var(--sky-blue)" : "1px solid var(--border-subtle)",
+                            transition: "all 0.15s ease"
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-main)" }}>{s.name}</div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                              {s.rollNumber ? `Roll: ${s.rollNumber}` : s.vmNo ? `VM: ${s.vmNo}` : s.email}
+                              {s.classId ? ` • Class: ${s.classId}` : ""}
+                            </div>
+                          </div>
+                          <div style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "4px",
+                            border: isSelected ? "1px solid var(--sky-blue)" : "1px solid var(--border-subtle)",
+                            backgroundColor: isSelected ? "var(--sky-blue)" : "transparent",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff"
+                          }}>
+                            {isSelected && <Check size={14} />}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
               <button type="button" onClick={() => setShowNoticeForm(false)} style={{ background: "transparent", border: "1px solid var(--border-subtle)", padding: "0.6rem 1.2rem", borderRadius: "8px", color: "var(--text-muted)", cursor: "pointer" }}>Cancel</button>
               <button type="submit" className="btn-sky" disabled={postingNotice}>
@@ -206,16 +367,19 @@ export default function HodNoticesPage() {
           notices.map((notice) => {
             const colors = getCategoryColor(notice.category);
             return (
-              <div key={notice.id} className="student-card premium-card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div key={notice.id} className="student-card premium-card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", borderLeft: `4px solid ${colors.text}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                     {getCategoryIcon(notice.category)}
-                    <h3 style={{ margin: 0, fontSize: "1.1rem", color: "var(--text-main)" }}>{notice.title}</h3>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--sky-blue)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>Announcement Heading</span>
+                      <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--text-main)" }}>{notice.title}</h3>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                     {notice.audience && (
-                      <span style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem", borderRadius: "4px", backgroundColor: "var(--bg-body)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
-                        {notice.audience}
+                      <span style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem", borderRadius: "4px", backgroundColor: "var(--bg-body)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)", fontWeight: 700 }}>
+                        {notice.audience === "ALL" ? "ALL (TEACHERS & STUDENTS)" : notice.audience === "FACULTY" ? "TEACHERS ONLY" : notice.audience === "STUDENT" ? "STUDENTS ONLY" : "SPECIFIC STUDENT"}
                       </span>
                     )}
                     <span style={{ 
@@ -232,7 +396,7 @@ export default function HodNoticesPage() {
                   </div>
                 </div>
                 
-                <p style={{ margin: 0, color: "var(--text-muted)", lineHeight: "1.6", whiteSpace: "pre-line" }}>
+                <p style={{ margin: "0.25rem 0", color: "var(--text-muted)", lineHeight: "1.6", whiteSpace: "pre-line", fontSize: "0.95rem" }}>
                   {notice.content}
                 </p>
                 

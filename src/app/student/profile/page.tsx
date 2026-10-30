@@ -102,7 +102,7 @@ export default function StudentProfilePage() {
         {!isEditing && (
           <button 
             onClick={() => setIsEditing(true)}
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1rem", backgroundColor: "var(--royal-blue)", color: "white", border: "none", borderRadius: "8px", fontWeight: "600", cursor: "pointer" }}
+            className="btn-royal"
           >
             <FiEdit2 /> Edit Profile
           </button>
@@ -203,17 +203,19 @@ export default function StudentProfilePage() {
           {/* Identity Card */}
           <div className="student-card premium-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "3rem 2rem" }}>
             <div style={{ 
-              width: "120px", 
-              height: "120px", 
+              width: "110px", 
+              height: "110px", 
               borderRadius: "50%", 
-              backgroundColor: "var(--bg-card-header)", 
+              backgroundColor: "var(--royal-blue)", 
               display: "flex", 
               alignItems: "center", 
               justifyContent: "center",
-              marginBottom: "1.5rem",
-              fontSize: "3rem",
-              color: "var(--royal-blue)",
-              fontWeight: 700
+              marginBottom: "1.25rem",
+              fontSize: "2.8rem",
+              color: "white",
+              fontWeight: 700,
+              border: "4px solid var(--bg-card)",
+              boxShadow: "0 2px 8px rgba(10, 102, 194, 0.25)"
             }}>
               {data.name.charAt(0).toUpperCase()}
             </div>

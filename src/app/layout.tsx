@@ -32,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} min-h-screen flex flex-col font-sans antialiased`}>
-        <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem>
+        <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem>
           {children}
         </ThemeProvider>
       </body>
