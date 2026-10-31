@@ -49,25 +49,31 @@ interface SubjectItem {
 
 interface TeacherAllocationProps {
   departments: { code: string; name: string }[];
+  initialTargetCourse?: SubjectItem | null;
   onTimetableGenerated?: (classId: string) => void;
   onCourseUpdated?: () => void;
+  onBackToCatalog?: () => void;
 }
 
 export default function TeacherSubjectAllocation({
   departments = [],
+  initialTargetCourse,
   onTimetableGenerated,
   onCourseUpdated,
+  onBackToCatalog,
 }: TeacherAllocationProps) {
   // Target Class Selection
   const [selectedDept, setSelectedDept] = useState<string>("CSE");
   const [selectedYear, setSelectedYear] = useState<string>("II");
   const [selectedSection, setSelectedSection] = useState<string>("A");
+  const [highlightedCourseCode, setHighlightedCourseCode] = useState<string | null>(null);
 
   // Data State
   const [catalogSubjects, setCatalogSubjects] = useState<SubjectItem[]>([]);
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [savingAllocations, setSavingAllocations] = useState<boolean>(false);
 
   // Subject-to-Teacher Mappings: subjectCode -> { facultyName, vmsNo, roomNo }
   const [assignments, setAssignments] = useState<
@@ -113,6 +119,9 @@ export default function TeacherSubjectAllocation({
     dayOrder: string;
     periods: [number, number]; // e.g. [5, 6]
     facultyName: string;
+    faculty1: string;
+    faculty2: string;
+    faculty3: string;
     roomNo: string;
   }>({
     enabled: false,
@@ -121,6 +130,9 @@ export default function TeacherSubjectAllocation({
     dayOrder: "IV",
     periods: [5, 6],
     facultyName: "Elective Coordinator",
+    faculty1: "",
+    faculty2: "",
+    faculty3: "",
     roomNo: "AUDITORIUM",
   });
 
@@ -187,7 +199,9 @@ export default function TeacherSubjectAllocation({
       // 2. Fetch Catalog Subjects
       const subjectsRes = await fetch("/api/admin/subjects").then((r) => r.json());
       if (subjectsRes.success && subjectsRes.subjects) {
-        setCatalogSubjects(subjectsRes.subjects);
+        const subs: any[] = subjectsRes.subjects;
+        setCatalogSubjects(subs);
+        populateClassAssignments(subs, usersRes?.users || [], computedClassId);
       }
     } catch (err: any) {
       console.error("Error loading allocation data:", err);
@@ -198,9 +212,90 @@ export default function TeacherSubjectAllocation({
     }
   };
 
+  // Helper: Populate assignments for a specific class section
+  const populateClassAssignments = (subs: SubjectItem[], allUsers: any[], targetClassId: string) => {
+    setAssignments((prev) => {
+      const classMap: Record<string, { facultyName: string; vmsNo: string; roomNo: string }> = {};
+
+      subs.forEach((sub: any) => {
+        // Priority 1: Check if there is an existing schedule slot specifically for this class
+        let classSlotFaculty = "";
+        let classSlotRoom = "";
+
+        if (sub.scheduleSlots && Array.isArray(sub.scheduleSlots)) {
+          const matchingSlot = sub.scheduleSlots.find(
+            (slot: any) => slot.classId && slot.classId.toUpperCase() === targetClassId.toUpperCase()
+          );
+          if (matchingSlot && matchingSlot.facultyName) {
+            classSlotFaculty = matchingSlot.facultyName;
+            classSlotRoom = matchingSlot.roomNo || "";
+          }
+        }
+
+        // If this class has its own assigned teacher in the timetable, use it!
+        if (classSlotFaculty) {
+          const matchedTeacher = (allUsers || []).find((u: any) => {
+            const rawFac = classSlotFaculty.split(/[,/]+/)[0].trim().toLowerCase();
+            return (u.name || "").toLowerCase() === rawFac;
+          });
+          classMap[sub.code] = {
+            facultyName: classSlotFaculty,
+            vmsNo: matchedTeacher?.vmNo || matchedTeacher?.facultyProfile?.vmNo || "",
+            roomNo: classSlotRoom || (sub.code.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201"),
+          };
+        } else if (prev[sub.code]) {
+          // Keep existing pending user edits
+          classMap[sub.code] = prev[sub.code];
+        } else {
+          // Empty assignment so each class can choose its own teacher
+          classMap[sub.code] = {
+            facultyName: "",
+            vmsNo: "",
+            roomNo: sub.code.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201",
+          };
+        }
+      });
+      return classMap;
+    });
+  };
+
   useEffect(() => {
     loadData();
   }, []);
+
+  // When class selection (year, dept, section) changes, reload class-specific assignments
+  useEffect(() => {
+    if (catalogSubjects.length > 0) {
+      populateClassAssignments(catalogSubjects, teachers, computedClassId);
+    }
+  }, [computedClassId]);
+
+  // When initialTargetCourse changes, auto-switch to its department and semester
+  useEffect(() => {
+    if (initialTargetCourse) {
+      if (initialTargetCourse.departmentCode) {
+        setSelectedDept(initialTargetCourse.departmentCode);
+      }
+      if (initialTargetCourse.semester) {
+        const sem = initialTargetCourse.semester;
+        if (sem <= 2) setSelectedYear("I");
+        else if (sem <= 4) setSelectedYear("II");
+        else if (sem <= 6) setSelectedYear("III");
+        else setSelectedYear("IV");
+      }
+      setHighlightedCourseCode(initialTargetCourse.code);
+      setSemesterFilter("ALL_CATALOG");
+      setSearchQuery(initialTargetCourse.code);
+
+      // Scroll into view after render
+      setTimeout(() => {
+        const el = document.getElementById(`allocation-row-${initialTargetCourse.code}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 500);
+    }
+  }, [initialTargetCourse]);
 
   // Scope filter: "SEMESTER" (default for target class), "ALL_CATALOG" (every course catalog subject), or specific semester "1".."8"
   const [semesterFilter, setSemesterFilter] = useState<string>("ALL_CATALOG");
@@ -254,17 +349,49 @@ export default function TeacherSubjectAllocation({
     return text.includes("lab") || text.includes("practical") || text.includes("workshop");
   };
 
-  // Update assignment for a subject
-  const handleTeacherSelect = (subCode: string, teacherName: string) => {
-    const matchedTeacher = teachers.find((t) => t.name === teacherName);
-    setAssignments((prev) => ({
-      ...prev,
-      [subCode]: {
-        facultyName: teacherName,
-        vmsNo: matchedTeacher?.vmNo || "",
-        roomNo: prev[subCode]?.roomNo || (subCode.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201"),
-      },
-    }));
+  // Check if subject is Elective (professional elective / open elective)
+  const checkIfElective = (sub: SubjectItem) => {
+    const text = `${sub.name} ${sub.code}`.toLowerCase();
+    return (
+      text.includes("elective") ||
+      text.includes(" pe ") ||
+      text.includes(" oe ") ||
+      text.startsWith("pe") ||
+      text.startsWith("oe") ||
+      text.includes("open elective") ||
+      text.includes("prof elective")
+    );
+  };
+
+  // Update assignment for a subject (supports multi-staff for labs and electives)
+  const handleTeacherSelect = (subCode: string, teacherName: string, slotIndex: number = 0) => {
+    setAssignments((prev) => {
+      const existing = prev[subCode] || { facultyName: "", vmsNo: "", roomNo: subCode.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201" };
+      const currentNames = (existing.facultyName || "").split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
+      const currentVms = (existing.vmsNo || "").split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
+
+      const matchedTeacher = teachers.find((t) => t.name === teacherName);
+      const teacherVm = matchedTeacher?.vmNo || "";
+
+      if (!teacherName) {
+        // Remove staff at slotIndex
+        currentNames.splice(slotIndex, 1);
+        currentVms.splice(slotIndex, 1);
+      } else {
+        // Set staff at slotIndex
+        currentNames[slotIndex] = teacherName;
+        currentVms[slotIndex] = teacherVm;
+      }
+
+      return {
+        ...prev,
+        [subCode]: {
+          facultyName: currentNames.join(", "),
+          vmsNo: currentVms.join(", "),
+          roomNo: existing.roomNo || (subCode.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201"),
+        },
+      };
+    });
   };
 
   const handleRoomChange = (subCode: string, roomNo: string) => {
@@ -382,6 +509,60 @@ export default function TeacherSubjectAllocation({
     }
   };
 
+  // Connect & Save Teacher-Subject Allocations directly to database & Course Catalog
+  const handleSaveAllocationsToCatalog = async () => {
+    const assignedEntries = Object.entries(assignments).filter(([_, val]) => val.facultyName);
+    if (assignedEntries.length === 0) {
+      alert("No teachers are currently selected for any subjects in this view. Please assign at least one teacher.");
+      return;
+    }
+
+    try {
+      setSavingAllocations(true);
+      setStatusMessage({
+        type: "info",
+        text: `Syncing and saving teacher allocations for ${assignedEntries.length} subjects to Course Catalog and faculty profiles...`,
+      });
+
+      // Save assignments to database through batch subject allocation endpoint
+      const res = await fetch("/api/admin/subjects/allocate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classId: computedClassId,
+          departmentCode: selectedDept,
+          allocations: assignedEntries.map(([code, val]) => ({
+            subjectCode: code,
+            facultyName: val.facultyName,
+            vmsNo: val.vmsNo || null,
+            roomNo: val.roomNo || null,
+          })),
+        }),
+      }).then((r) => r.json());
+
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: `Successfully connected & saved allocations for ${assignedEntries.length} subjects! Course Catalog and Faculty Directory now reflect these teacher assignments.`,
+        });
+        await loadData();
+        if (onCourseUpdated) onCourseUpdated();
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: res.error || "Failed to save teacher allocations.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err.message || "Error saving allocations.",
+      });
+    } finally {
+      setSavingAllocations(false);
+    }
+  };
+
   // Delete subject from Course Catalog
   const handleDeleteSubject = async (sub: SubjectItem) => {
     if (!confirm(`Are you sure you want to delete course "${sub.code} - ${sub.name}" from the Course Catalog?`)) {
@@ -445,6 +626,12 @@ export default function TeacherSubjectAllocation({
         payloadRules[code] = r;
       });
 
+      const combinedElectiveFaculty = [
+        electiveConfig.faculty1,
+        electiveConfig.faculty2,
+        electiveConfig.faculty3,
+      ].filter(Boolean).join(", ") || electiveConfig.facultyName || "Elective Coordinator";
+
       const res = await fetch("/api/admin/timetable/randomize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -454,7 +641,10 @@ export default function TeacherSubjectAllocation({
           subjectRules: payloadRules,
           sportsConfig,
           libraryConfig,
-          electiveConfig,
+          electiveConfig: {
+            ...electiveConfig,
+            facultyName: combinedElectiveFaculty,
+          },
         }),
       }).then((r) => r.json());
 
@@ -539,25 +729,48 @@ export default function TeacherSubjectAllocation({
             </p>
           </div>
 
-          <button
-            onClick={loadData}
-            disabled={refreshing}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.5rem 0.9rem",
-              borderRadius: "8px",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-card)",
-              color: "var(--text-main)",
-              fontSize: "0.85rem",
-              fontWeight: "600",
-              cursor: refreshing ? "not-allowed" : "pointer",
-            }}
-          >
-            <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh Data
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {onBackToCatalog && (
+              <button
+                onClick={onBackToCatalog}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  padding: "0.5rem 0.9rem",
+                  borderRadius: "8px",
+                  border: "1px solid var(--sky-blue)",
+                  backgroundColor: "rgba(56, 189, 248, 0.12)",
+                  color: "var(--sky-blue)",
+                  fontSize: "0.85rem",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                }}
+              >
+                <BookOpen size={14} /> Back to Course Catalog
+              </button>
+            )}
+
+            <button
+              onClick={loadData}
+              disabled={refreshing}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.5rem 0.9rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-card)",
+                color: "var(--text-main)",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                cursor: refreshing ? "not-allowed" : "pointer",
+              }}
+            >
+              <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh Data
+            </button>
+          </div>
         </div>
 
         {/* Class Selection Strip */}
@@ -637,8 +850,11 @@ export default function TeacherSubjectAllocation({
                 textAlign: "center",
               }}
             >
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>TARGET CLASS</span>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>ALLOCATING FOR CLASS</span>
               <strong style={{ fontSize: "1rem", color: "var(--sky-blue)", letterSpacing: "0.03em" }}>{computedClassId}</strong>
+              <span style={{ fontSize: "0.68rem", color: "#10b981", display: "block", marginTop: "2px", fontWeight: "600" }}>
+                ✓ Independent Staff per Section
+              </span>
             </div>
           </div>
         </div>
@@ -732,7 +948,7 @@ export default function TeacherSubjectAllocation({
                 </label>
                 <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Dept-wide Sync</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
                 <div>
                   <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Day Order</span>
                   <select
@@ -764,6 +980,60 @@ export default function TeacherSubjectAllocation({
                     <option value="1-2">Periods 1 & 2 (2-P Block)</option>
                     <option value="7-8">Periods 7 & 8 (2-P Block)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* 3 Dedicated Elective Staff Selectors */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "0.35rem", paddingTop: "0.35rem", borderTop: "1px dashed var(--border-subtle)" }}>
+                <span style={{ fontSize: "0.68rem", fontWeight: "700", color: "#c084fc" }}>
+                  Elective Faculty (Up to 3 Staff Members):
+                </span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.35rem" }}>
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", display: "block" }}>Staff 1</span>
+                    <select
+                      disabled={!electiveConfig.enabled}
+                      value={electiveConfig.faculty1}
+                      onChange={(e) => setElectiveConfig({ ...electiveConfig, faculty1: e.target.value })}
+                      className="premium-input"
+                      style={{ width: "100%", fontSize: "0.72rem", padding: "0.25rem 0.35rem" }}
+                    >
+                      <option value="">-- Faculty 1 --</option>
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", display: "block" }}>Staff 2</span>
+                    <select
+                      disabled={!electiveConfig.enabled}
+                      value={electiveConfig.faculty2}
+                      onChange={(e) => setElectiveConfig({ ...electiveConfig, faculty2: e.target.value })}
+                      className="premium-input"
+                      style={{ width: "100%", fontSize: "0.72rem", padding: "0.25rem 0.35rem" }}
+                    >
+                      <option value="">-- Faculty 2 --</option>
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", display: "block" }}>Staff 3</span>
+                    <select
+                      disabled={!electiveConfig.enabled}
+                      value={electiveConfig.faculty3}
+                      onChange={(e) => setElectiveConfig({ ...electiveConfig, faculty3: e.target.value })}
+                      className="premium-input"
+                      style={{ width: "100%", fontSize: "0.72rem", padding: "0.25rem 0.35rem" }}
+                    >
+                      <option value="">-- Faculty 3 --</option>
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -863,6 +1133,29 @@ export default function TeacherSubjectAllocation({
             }}
           >
             Auto-Fill Teachers Evenly
+          </button>
+
+          <button
+            onClick={handleSaveAllocationsToCatalog}
+            disabled={savingAllocations || assignedCount === 0}
+            title="Persist assigned faculty to Course Catalog & Faculty Profiles"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              padding: "0.6rem 1.15rem",
+              borderRadius: "8px",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
+              backgroundColor: "rgba(16, 185, 129, 0.12)",
+              color: "#10b981",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: savingAllocations || assignedCount === 0 ? "not-allowed" : "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <CheckCircle2 size={15} />
+            {savingAllocations ? "Saving Allocations..." : `Save Allocations to Catalog (${assignedCount})`}
           </button>
 
           <button
@@ -1154,16 +1447,27 @@ export default function TeacherSubjectAllocation({
                     isContinuous: isLab ? true : false,
                   };
 
+                  const isHighlighted = highlightedCourseCode === sub.code;
+
                   return (
                     <tr
+                      id={`allocation-row-${sub.code}`}
                       key={sub.code || sub.id}
                       style={{
-                        borderBottom: "1px solid var(--border-subtle)",
-                        backgroundColor: currentAssignment.facultyName ? "rgba(16, 185, 129, 0.03)" : "transparent",
+                        borderBottom: isHighlighted ? "2px solid var(--sky-blue)" : "1px solid var(--border-subtle)",
+                        backgroundColor: isHighlighted
+                          ? "rgba(56, 189, 248, 0.14)"
+                          : currentAssignment.facultyName
+                          ? "rgba(16, 185, 129, 0.03)"
+                          : "transparent",
+                        transition: "all 0.3s ease",
                       }}
                     >
-                      <td style={{ padding: "0.75rem 1rem", fontWeight: "700", fontFamily: "monospace", color: "var(--sky-blue)" }}>
-                        {sub.code}
+                      <td style={{ padding: "0.75rem 1rem", fontWeight: "700", fontFamily: "monospace", color: isHighlighted ? "#38bdf8" : "var(--sky-blue)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          {isHighlighted && <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--sky-blue)" }} />}
+                          {sub.code}
+                        </div>
                       </td>
                       <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: "500" }}>
                         <div>{sub.name}</div>
@@ -1178,44 +1482,132 @@ export default function TeacherSubjectAllocation({
                             borderRadius: "4px",
                             fontSize: "0.7rem",
                             fontWeight: "700",
-                            backgroundColor: isLab ? "rgba(245, 158, 11, 0.15)" : "rgba(59, 130, 246, 0.15)",
-                            color: isLab ? "#f59e0b" : "var(--royal-blue)",
+                            backgroundColor: isLab
+                              ? "rgba(245, 158, 11, 0.15)"
+                              : checkIfElective(sub)
+                              ? "rgba(192, 132, 252, 0.15)"
+                              : "rgba(59, 130, 246, 0.15)",
+                            color: isLab ? "#f59e0b" : checkIfElective(sub) ? "#c084fc" : "var(--royal-blue)",
                           }}
                         >
-                          {isLab ? "LAB" : "THEORY"}
+                          {isLab ? "LAB (2 Staff)" : checkIfElective(sub) ? "ELECTIVE (3 Staff)" : "THEORY (1 Prof)"}
                         </span>
                       </td>
                       <td style={{ padding: "0.75rem 1rem" }}>
-                        <select
-                          value={currentAssignment.facultyName}
-                          onChange={(e) => handleTeacherSelect(sub.code, e.target.value)}
-                          className="premium-input"
-                          style={{ width: "100%", padding: "0.4rem 0.6rem", fontSize: "0.85rem" }}
-                        >
-                          <option value="">-- Choose Handling Teacher --</option>
-                          {teachers.map((t) => {
-                            const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
-                              .filter(Boolean)
-                              .map(s => String(s).trim());
+                        {(() => {
+                          const isElec = checkIfElective(sub);
+                          const assignedList = (currentAssignment.facultyName || "").split(/[,/]+/).map(s => s.trim()).filter(Boolean);
+                          const staff1 = assignedList[0] || "";
+                          const staff2 = assignedList[1] || "";
+                          const staff3 = assignedList[2] || "";
 
-                            const subNameLower = sub.name.toLowerCase();
-                            const subCodeLower = sub.code.toLowerCase();
-                            const hasProfileMatch = profileSubjects.some(ps => {
-                              const psl = ps.toLowerCase();
-                              return psl === subCodeLower || psl === subNameLower || subNameLower.includes(psl) || psl.includes(subNameLower);
-                            });
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                              {/* Staff 1 / Primary Handling Professor */}
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                {(isLab || isElec) && (
+                                  <span style={{ fontSize: "0.68rem", fontWeight: "700", color: "var(--text-muted)", minWidth: "48px" }}>
+                                    Staff 1:
+                                  </span>
+                                )}
+                                <select
+                                  value={staff1}
+                                  onChange={(e) => handleTeacherSelect(sub.code, e.target.value, 0)}
+                                  className="premium-input"
+                                  style={{ width: "100%", padding: "0.35rem 0.5rem", fontSize: "0.82rem" }}
+                                >
+                                  <option value="">
+                                    {isLab
+                                      ? "-- Select Primary Lab Faculty (Staff 1) --"
+                                      : isElec
+                                      ? "-- Select Elective Faculty 1 --"
+                                      : "-- Choose Handling Professor (1 for this class) --"}
+                                  </option>
+                                  {teachers.map((t) => {
+                                    const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
+                                      .filter(Boolean)
+                                      .map(s => String(s).trim());
 
-                            const subjectBadge = profileSubjects.length > 0
-                              ? ` • Profile: ${profileSubjects.slice(0, 2).join(", ")}`
-                              : "";
+                                    const subNameLower = sub.name.toLowerCase();
+                                    const subCodeLower = sub.code.toLowerCase();
+                                    const hasProfileMatch = profileSubjects.some(ps => {
+                                      const psl = ps.toLowerCase();
+                                      return psl === subCodeLower || psl === subNameLower || subNameLower.includes(psl) || psl.includes(subNameLower);
+                                    });
 
-                            return (
-                              <option key={t.id} value={t.name}>
-                                {hasProfileMatch ? "★ " : ""}{t.name} {t.vmNo ? `(MTS: ${t.vmNo})` : ""} [{t.role}]{subjectBadge}
-                              </option>
-                            );
-                          })}
-                        </select>
+                                    const subjectBadge = profileSubjects.length > 0
+                                      ? ` • Profile: ${profileSubjects.slice(0, 2).join(", ")}`
+                                      : "";
+
+                                    return (
+                                      <option key={t.id} value={t.name}>
+                                        {hasProfileMatch ? "★ " : ""}{t.name} {t.vmNo ? `(MTS: ${t.vmNo})` : ""} [{t.role}]{subjectBadge}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </div>
+
+                              {/* Staff 2 (Available for Labs and Electives) */}
+                              {(isLab || isElec) && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                  <span style={{ fontSize: "0.68rem", fontWeight: "700", color: isLab ? "#f59e0b" : "#c084fc", minWidth: "48px" }}>
+                                    Staff 2:
+                                  </span>
+                                  <select
+                                    value={staff2}
+                                    onChange={(e) => handleTeacherSelect(sub.code, e.target.value, 1)}
+                                    className="premium-input"
+                                    style={{
+                                      width: "100%",
+                                      padding: "0.35rem 0.5rem",
+                                      fontSize: "0.82rem",
+                                      borderColor: staff2 ? (isLab ? "rgba(245, 158, 11, 0.4)" : "rgba(192, 132, 252, 0.4)") : "var(--border-subtle)"
+                                    }}
+                                  >
+                                    <option value="">
+                                      {isLab
+                                        ? "-- Select 2nd Lab Faculty (Co-Incharge) --"
+                                        : "-- Select Elective Faculty 2 --"}
+                                    </option>
+                                    {teachers.map((t) => (
+                                      <option key={t.id} value={t.name}>
+                                        {t.name} {t.vmNo ? `(MTS: ${t.vmNo})` : ""} [{t.role}]
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
+                              {/* Staff 3 (Available for Electives) */}
+                              {isElec && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                  <span style={{ fontSize: "0.68rem", fontWeight: "700", color: "#c084fc", minWidth: "48px" }}>
+                                    Staff 3:
+                                  </span>
+                                  <select
+                                    value={staff3}
+                                    onChange={(e) => handleTeacherSelect(sub.code, e.target.value, 2)}
+                                    className="premium-input"
+                                    style={{
+                                      width: "100%",
+                                      padding: "0.35rem 0.5rem",
+                                      fontSize: "0.82rem",
+                                      borderColor: staff3 ? "rgba(192, 132, 252, 0.4)" : "var(--border-subtle)"
+                                    }}
+                                  >
+                                    <option value="">-- Select Elective Faculty 3 --</option>
+                                    {teachers.map((t) => (
+                                      <option key={t.id} value={t.name}>
+                                        {t.name} {t.vmNo ? `(MTS: ${t.vmNo})` : ""} [{t.role}]
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       {/* Periods Per Week Selector */}
                       <td style={{ padding: "0.75rem 1rem" }}>

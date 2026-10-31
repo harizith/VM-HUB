@@ -333,48 +333,83 @@ export default function OverallTimetable({
                                 color: "var(--text-muted)",
                                 wordBreak: "break-word"
                               }}>
-                                {entry?.facultyName && entry.facultyName.includes(",") ? (
-                                  <div style={{ marginTop: "3px" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
-                                      <span style={{
-                                        fontSize: "0.62rem",
-                                        fontWeight: 800,
-                                        backgroundColor: "rgba(56, 189, 248, 0.15)",
-                                        color: "var(--sky-blue)",
-                                        padding: "1px 4px",
-                                        borderRadius: "3px",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.03em"
-                                      }}>
-                                        Lab Staff ({entry.facultyName.split(",").length})
-                                      </span>
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "1.5px" }}>
-                                      {entry.facultyName.split(",").map((fn, fIdx) => (
-                                        <div key={fIdx} style={{
-                                          fontSize: "0.71rem",
-                                          color: "var(--text-main)",
-                                          fontWeight: 600,
-                                          lineHeight: 1.2
-                                        }}>
-                                          • {fn.trim()}
+                                {(() => {
+                                  const rawName = entry?.facultyName || "";
+                                  const staffList = rawName.split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+                                  const isLabSlot = (entry?.subjectName || entry?.subjectCode || "").toLowerCase().includes("lab");
+                                  const isElectiveSlot =
+                                    (entry?.subjectName || entry?.subjectCode || "").toLowerCase().includes("elective") ||
+                                    (entry?.category || "").toLowerCase() === "pe" ||
+                                    (entry?.category || "").toLowerCase() === "oe";
+
+                                  if (staffList.length > 1) {
+                                    const badgeTitle = isLabSlot
+                                      ? `Lab In-Charge (${staffList.length} Staff)`
+                                      : isElectiveSlot
+                                      ? `Elective Faculty (${staffList.length} Staff)`
+                                      : `Faculty (${staffList.length})`;
+
+                                    const badgeBg = isLabSlot
+                                      ? "rgba(245, 158, 11, 0.15)"
+                                      : isElectiveSlot
+                                      ? "rgba(192, 132, 252, 0.15)"
+                                      : "rgba(56, 189, 248, 0.15)";
+
+                                    const badgeColor = isLabSlot
+                                      ? "#f59e0b"
+                                      : isElectiveSlot
+                                      ? "#c084fc"
+                                      : "var(--sky-blue)";
+
+                                    return (
+                                      <div style={{ marginTop: "3px" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
+                                          <span style={{
+                                            fontSize: "0.62rem",
+                                            fontWeight: 800,
+                                            backgroundColor: badgeBg,
+                                            color: badgeColor,
+                                            padding: "1px 4px",
+                                            borderRadius: "3px",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.03em"
+                                          }}>
+                                            {badgeTitle}
+                                          </span>
                                         </div>
-                                      ))}
-                                    </div>
-                                    {mode !== "student" && (
-                                      <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                                        Class: <strong>{entry?.classId || classId}</strong>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "1.5px" }}>
+                                          {staffList.map((fn: string, fIdx: number) => (
+                                            <div key={fIdx} style={{
+                                              fontSize: "0.71rem",
+                                              color: "var(--text-main)",
+                                              fontWeight: 600,
+                                              lineHeight: 1.2
+                                            }}>
+                                              • {fn}
+                                            </div>
+                                          ))}
+                                        </div>
+                                        {mode !== "student" && (
+                                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                                            Class: <strong>{entry?.classId || classId}</strong>
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
-                                  </div>
-                                ) : mode === "student" ? (
-                                  entry?.facultyName || "Faculty"
-                                ) : (
-                                  <span>
-                                    <strong style={{ color: "var(--text-main)" }}>{entry?.classId || classId}</strong>
-                                    {entry?.facultyName ? ` • ${entry.facultyName}` : ""}
-                                  </span>
-                                )}
+                                    );
+                                  }
+
+                                  // Exactly 1 professor assigned for this class
+                                  return mode === "student" ? (
+                                    <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+                                      {rawName || "Faculty"}
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      <strong style={{ color: "var(--text-main)" }}>{entry?.classId || classId}</strong>
+                                      {rawName ? ` • ${rawName}` : ""}
+                                    </span>
+                                  );
+                                })()}
                               </div>
 
                               {/* 3. Room Number */}

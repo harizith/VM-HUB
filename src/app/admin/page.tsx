@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle, UserCheck } from "lucide-react";
+import { Users, Building2, BookOpen, Megaphone, Calendar, Sun, Moon, Globe, GraduationCap, Briefcase, UserCircle, Shield, Save, Edit, ArrowRight, Trash2, FileSpreadsheet, UserPlus, FileText, X, Zap, LayoutGrid, Shuffle, UserCheck, Loader2, History } from "lucide-react";
 import AdminAgentChat from "@/components/AdminAgentChat";
 import AdminTimetablePdfUpload from "@/components/AdminTimetablePdfUpload";
 import AdminTimetableExcelUpload from "@/components/AdminTimetableExcelUpload";
@@ -41,6 +41,11 @@ interface UserItem {
     additional1?: string | null;
     additional2?: string | null;
   } | null;
+  hodProfile?: {
+    vmNo: string;
+    department: string;
+    designation: string;
+  } | null;
 }
 interface DeptItem { id: string; code: string; name: string; hodName?: string; }
 interface SubjectItem {
@@ -61,7 +66,24 @@ interface SubjectItem {
     timeRange: string;
   }[];
 }
-interface NoticeItem { id: string; title: string; content: string; category: string; audience?: string; postedBy: string; createdAt: string; }
+interface NoticeItem {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  audience?: string;
+  department?: string | null;
+  targetStudentId?: string | null;
+  postedBy?: string;
+  authorId?: string | null;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+  createdAt: string;
+}
 
 interface AuditLogItem {
   id: string;
@@ -101,6 +123,7 @@ export default function AdminPage() {
   // Selected User & Selected Subject for Side Drawers
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<SubjectItem | null>(null);
+  const [targetAllocationCourse, setTargetAllocationCourse] = useState<SubjectItem | null>(null);
 
   // State loaded from DB
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -109,6 +132,7 @@ export default function AdminPage() {
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Timetable State
   const [timetableMode, setTimetableMode] = useState<"faculty" | "class">("faculty");
@@ -141,6 +165,13 @@ export default function AdminPage() {
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [timetableHistoryVersions, setTimetableHistoryVersions] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<any | null>(null);
+  const [historyAcademicYear, setHistoryAcademicYear] = useState("2026-2027");
+  const [historySemester, setHistorySemester] = useState<number>(3);
+  const [historyChangeReason, setHistoryChangeReason] = useState("Next Year / Semester Transition");
 
   // User Timetable Modal State
   const [userTimetableModalUser, setUserTimetableModalUser] = useState<UserItem | null>(null);
@@ -371,6 +402,7 @@ export default function AdminPage() {
   const [newDeptCode, setNewDeptCode] = useState("");
   const [newDeptName, setNewDeptName] = useState("");
   const [newDeptHod, setNewDeptHod] = useState("");
+  const [newDeptHodVmNo, setNewDeptHodVmNo] = useState("");
 
   // Subject Form
   const [newSubCode, setNewSubCode] = useState("");
@@ -384,6 +416,7 @@ export default function AdminPage() {
   const [newNoticeContent, setNewNoticeContent] = useState("");
   const [newNoticeCategory, setNewNoticeCategory] = useState("GENERAL");
   const [newNoticeAudience, setNewNoticeAudience] = useState("ALL");
+  const [newNoticeDept, setNewNoticeDept] = useState("");
 
 
   // Apply Theme
@@ -394,8 +427,12 @@ export default function AdminPage() {
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
   // Fetch all data
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setIsSyncing(true);
+    }
     try {
       const safeFetch = async (url: string) => {
         try {
@@ -450,127 +487,269 @@ export default function AdminPage() {
       console.error("Error fetching data:", err);
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
   useEffect(() => { 
-    fetchData(); 
+    fetchData(false); 
   }, []);
 
-  // Filter users: hide system admin accounts from the view
-  const nonAdminUsers = users.filter((u) => u.role !== "ADMIN");
+  // Filter users by active subdivision (including ADMIN accounts)
+  const allDisplayUsers = users;
 
   // Filter users by active subdivision
-  const filteredUsers = nonAdminUsers.filter((u) => {
+  const filteredUsers = allDisplayUsers.filter((u) => {
     if (userRoleSubdivision === "ALL") return true;
     return u.role === userRoleSubdivision;
   });
 
-  // Handlers
+  // Handlers with Optimistic Updates & Smooth Background Sync
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const email = newUserEmail.toLowerCase().trim();
+    const name = newUserName.trim();
+    const password = newUserPass;
+    const role = newUserRole;
+    const vmNo = newUserVmNo.trim();
+    const dept = newUserDept;
+    const year = newUserYear;
+    const section = newUserSection;
+    const designation = newUserDesignation;
+
+    // Optimistic user object preview
+    const tempUser: UserItem = {
+      id: `temp-${Date.now()}`,
+      email,
+      name,
+      role,
+      status: "ACTIVE",
+      vmNo: vmNo || null,
+      createdAt: new Date().toISOString(),
+      studentProfile: role === "STUDENT" ? {
+        rollNumber: vmNo,
+        department: dept,
+        semester: 3,
+        batch: "2023-2027",
+        year,
+        section,
+      } : null,
+      facultyProfile: role === "FACULTY" ? {
+        vmNo,
+        department: dept,
+        designation,
+      } : null,
+      hodProfile: role === "HOD" ? {
+        vmNo,
+        department: dept,
+        designation: designation || `Head of Department (${dept})`,
+      } : null,
+    };
+
+    // Update state immediately without loading screen
+    setUsers((prev) => [tempUser, ...prev]);
+    setShowUserModal(false);
+    setNewUserEmail("");
+    setNewUserName("");
+    setNewUserPass("");
+    setNewUserVmNo("");
+    setNewUserDesignation("Assistant Professor");
+
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: newUserEmail,
-        name: newUserName,
-        password: newUserPass,
-        role: newUserRole,
-        vmNo: newUserVmNo,
-        department: newUserDept,
-        year: newUserYear,
-        section: newUserSection,
-        designation: newUserDesignation,
+        email,
+        name,
+        password,
+        role,
+        vmNo,
+        department: dept,
+        year,
+        section,
+        designation,
       }),
     }).then((r) => r.json());
 
     if (res.success) {
-      setShowUserModal(false);
-      setNewUserEmail("");
-      setNewUserName("");
-      setNewUserPass("");
-      setNewUserVmNo("");
-      setNewUserDesignation("Assistant Professor");
-      fetchData();
+      fetchData(true); // silent background reconcile
     } else {
-      alert("Error: " + res.error);
+      // Rollback on failure
+      setUsers((prev) => prev.filter((u) => u.id !== tempUser.id));
+      alert("Error creating user: " + (res.error || "Failed to create user"));
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Delete this user?")) return;
+    const previousUsers = [...users];
+    // Immediate optimistic removal
+    setUsers((prev) => prev.filter((u) => u.id !== id));
+    if (selectedUser?.id === id) setSelectedUser(null);
+
     const res = await fetch(`/api/admin/users?id=${id}`, { method: "DELETE" }).then((r) => r.json());
     if (res.success) {
-      if (selectedUser?.id === id) setSelectedUser(null);
-      fetchData();
-    } else alert("Error: " + res.error);
+      fetchData(true); // silent sync
+    } else {
+      setUsers(previousUsers); // rollback
+      alert("Error: " + res.error);
+    }
   };
 
   const handleCreateDept = async (e: React.FormEvent) => {
     e.preventDefault();
+    const tempDept: DeptItem = {
+      id: `temp-dept-${Date.now()}`,
+      code: newDeptCode.toUpperCase().trim(),
+      name: newDeptName.trim(),
+      hodName: newDeptHod.trim() || undefined,
+    };
+
+    setDepts((prev) => [...prev, tempDept]);
+    setShowDeptModal(false);
+    const code = newDeptCode;
+    const name = newDeptName;
+    const hodVmNo = newDeptHodVmNo;
+    const hodName = newDeptHod;
+    setNewDeptCode("");
+    setNewDeptName("");
+    setNewDeptHod("");
+    setNewDeptHodVmNo("");
+
     const res = await fetch("/api/admin/departments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: newDeptCode, name: newDeptName, hodName: newDeptHod }),
-    }).then((r) => r.json());
-
-    if (res.success) { setShowDeptModal(false); setNewDeptCode(""); setNewDeptName(""); setNewDeptHod(""); fetchData(); }
-    else alert("Error: " + res.error);
-  };
-
-  const handleDeleteDept = async (id: string) => {
-    if (!confirm("Delete department?")) return;
-    const res = await fetch(`/api/admin/departments?id=${id}`, { method: "DELETE" }).then((r) => r.json());
-    if (res.success) fetchData(); else alert("Error: " + res.error);
-  };
-
-  const handleCreateSubject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = await fetch("/api/admin/subjects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: newSubCode, name: newSubName, credits: newSubCredits, semester: newSubSem, departmentCode: newSubDept }),
-    }).then((r) => r.json());
-
-    if (res.success) { setShowSubjectModal(false); setNewSubCode(""); setNewSubName(""); fetchData(); }
-    else alert("Error: " + res.error);
-  };
-
-  const handleDeleteSubject = async (id: string) => {
-    if (!confirm("Delete subject?")) return;
-    const res = await fetch(`/api/admin/subjects?id=${id}`, { method: "DELETE" }).then((r) => r.json());
-    if (res.success) fetchData(); else alert("Error: " + res.error);
-  };
-
-  const handleCreateNotice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = await fetch("/api/admin/notices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-        title: newNoticeTitle, 
-        content: newNoticeContent, 
-        category: newNoticeCategory,
-        audience: newNoticeAudience 
+        code, 
+        name, 
+        hodVmNo,
+        hodName 
       }),
     }).then((r) => r.json());
 
     if (res.success) { 
-      setShowNoticeModal(false); 
-      setNewNoticeTitle(""); 
-      setNewNoticeContent(""); 
-      setNewNoticeAudience("ALL");
-      fetchData(); 
+      fetchData(true); // silent background reconcile
+    } else {
+      setDepts((prev) => prev.filter((d) => d.id !== tempDept.id));
+      alert("Error: " + res.error);
     }
-    else alert("Error: " + res.error);
   };
 
+  const handleDeleteDept = async (id: string) => {
+    if (!confirm("Delete department?")) return;
+    const previousDepts = [...depts];
+    setDepts((prev) => prev.filter((d) => d.id !== id));
+
+    const res = await fetch(`/api/admin/departments?id=${id}`, { method: "DELETE" }).then((r) => r.json());
+    if (res.success) {
+      fetchData(true);
+    } else {
+      setDepts(previousDepts);
+      alert("Error: " + res.error);
+    }
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const tempSub: SubjectItem = {
+      id: `temp-sub-${Date.now()}`,
+      code: newSubCode.toUpperCase().trim(),
+      name: newSubName.trim(),
+      credits: parseInt(newSubCredits, 10) || 3,
+      semester: parseInt(newSubSem, 10) || 5,
+      departmentCode: newSubDept,
+    };
+
+    setSubjects((prev) => [...prev, tempSub]);
+    setShowSubjectModal(false);
+    const code = newSubCode;
+    const name = newSubName;
+    const credits = newSubCredits;
+    const semester = newSubSem;
+    const departmentCode = newSubDept;
+    setNewSubCode("");
+    setNewSubName("");
+
+    const res = await fetch("/api/admin/subjects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, name, credits, semester, departmentCode }),
+    }).then((r) => r.json());
+
+    if (res.success) { 
+      fetchData(true); 
+    } else {
+      setSubjects((prev) => prev.filter((s) => s.id !== tempSub.id));
+      alert("Error: " + res.error);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (!confirm("Delete subject?")) return;
+    const prevSubs = [...subjects];
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
+
+    const res = await fetch(`/api/admin/subjects?id=${id}`, { method: "DELETE" }).then((r) => r.json());
+    if (res.success) {
+      fetchData(true);
+    } else {
+      setSubjects(prevSubs);
+      alert("Error: " + res.error);
+    }
+  };
+
+  const handleCreateNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const tempNotice: NoticeItem = {
+      id: `temp-notice-${Date.now()}`,
+      title: newNoticeTitle.trim(),
+      content: newNoticeContent.trim(),
+      category: newNoticeCategory,
+      audience: newNoticeAudience,
+      department: newNoticeDept ? newNoticeDept : null,
+      postedBy: "Admin",
+      createdAt: new Date().toISOString(),
+    };
+
+    setNotices((prev) => [tempNotice, ...prev]);
+    setShowNoticeModal(false);
+    const title = newNoticeTitle;
+    const content = newNoticeContent;
+    const category = newNoticeCategory;
+    const audience = newNoticeAudience;
+    const department = newNoticeDept;
+    setNewNoticeTitle("");
+    setNewNoticeContent("");
+    setNewNoticeAudience("ALL");
+    setNewNoticeDept("");
+
+    const res = await fetch("/api/admin/notices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content, category, audience, department }),
+    }).then((r) => r.json());
+
+    if (res.success) { 
+      fetchData(true); 
+    } else {
+      setNotices((prev) => prev.filter((n) => n.id !== tempNotice.id));
+      alert("Error: " + res.error);
+    }
+  };
 
   const handleDeleteNotice = async (id: string) => {
     if (!confirm("Delete notice?")) return;
+    const prevNotices = [...notices];
+    setNotices((prev) => prev.filter((n) => n.id !== id));
+
     const res = await fetch(`/api/admin/notices?id=${id}`, { method: "DELETE" }).then((r) => r.json());
-    if (res.success) fetchData(); else alert("Error: " + res.error);
+    if (res.success) {
+      fetchData(true);
+    } else {
+      setNotices(prevNotices);
+      alert("Error: " + res.error);
+    }
   };
 
   const handleUpdateDayOrder = async () => {
@@ -582,8 +761,7 @@ export default function AdminPage() {
     }).then(r => r.json());
 
     if (res.success) {
-      alert("Day order updated successfully for today.");
-      fetchData();
+      fetchData(true);
     } else {
       alert("Error updating day order: " + res.error);
     }
@@ -591,6 +769,8 @@ export default function AdminPage() {
   };
 
   const handleUpdateLeave = async (target: 'today' | 'tomorrow', status: string) => {
+    if (target === 'today') setTodayStatus(status);
+    else setTomorrowStatus(status);
     setUpdatingLeave(true);
     const res = await fetch("/api/admin/leaves", {
       method: "POST",
@@ -599,7 +779,7 @@ export default function AdminPage() {
     }).then(r => r.json());
 
     if (res.success) {
-      fetchData();
+      fetchData(true);
     } else {
       alert("Error updating status: " + res.error);
     }
@@ -629,7 +809,7 @@ export default function AdminPage() {
 
           <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {[
-              { id: "users", label: "User Accounts", Icon: Users, count: nonAdminUsers.length },
+              { id: "users", label: "User Accounts", Icon: Users, count: allDisplayUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
               { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
@@ -767,16 +947,33 @@ export default function AdminPage() {
                 ☰
               </button>
               <div>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>
-                  {activeTab === "users" && "User Directory & Role Subdivisions"}
-                  {activeTab === "depts" && "Academic Departments"}
-                  {activeTab === "subjects" && "Course & Subject Catalog"}
-                  {activeTab === "teacher-allocations" && "Subject-Handling Teacher Allocations & Randomize Deck"}
-                  {activeTab === "notices" && "System Announcements & Broadcasts"}
-                  {activeTab === "timetable" && "Class Timetable Management"}
-                  {(activeTab === "upload-timetable" || activeTab === "upload-users") && "Bulk Onboarding, Timetable Import & Official Templates"}
-                  {(activeTab === "automation" || activeTab === "audit") && "Autonomous Operations, Diagnostics & Audit Trail"}
-                </h1>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <h1 style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0, fontFamily: "var(--font-serif, serif)" }}>
+                    {activeTab === "users" && "User Directory & Role Subdivisions"}
+                    {activeTab === "depts" && "Academic Departments"}
+                    {activeTab === "subjects" && "Course & Subject Catalog"}
+                    {activeTab === "teacher-allocations" && "Subject-Handling Teacher Allocations & Randomize Deck"}
+                    {activeTab === "notices" && "System Announcements & Broadcasts"}
+                    {activeTab === "timetable" && "Class Timetable Management"}
+                    {(activeTab === "upload-timetable" || activeTab === "upload-users") && "Bulk Onboarding, Timetable Import & Official Templates"}
+                    {(activeTab === "automation" || activeTab === "audit") && "Autonomous Operations, Diagnostics & Audit Trail"}
+                  </h1>
+                  {isSyncing && (
+                    <span style={{ 
+                      display: "inline-flex", 
+                      alignItems: "center", 
+                      gap: "0.35rem", 
+                      fontSize: "0.75rem", 
+                      padding: "0.2rem 0.6rem", 
+                      borderRadius: "12px", 
+                      backgroundColor: "rgba(10, 102, 194, 0.12)", 
+                      color: "var(--royal-blue)", 
+                      fontWeight: "600" 
+                    }}>
+                      <Loader2 size={12} className="spin" style={{ animation: "spin 1s linear infinite" }} /> Syncing...
+                    </span>
+                  )}
+                </div>
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Vel Tech Multi Tech Autonomous ERP System</p>
               </div>
             </div>
@@ -786,8 +983,11 @@ export default function AdminPage() {
           </div>
         </header>
 
-        {loading ? (
-          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>Loading database records...</div>
+        {loading && users.length === 0 && depts.length === 0 ? (
+          <div style={{ padding: "4rem 2rem", textAlign: "center", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+            <Loader2 size={32} style={{ animation: "spin 1s linear infinite", color: "var(--royal-blue)" }} />
+            <span>Initializing database records...</span>
+          </div>
         ) : (
           <>
             {/* USERS TABLE WITH CLICKABLE ROWS */}
@@ -804,10 +1004,11 @@ export default function AdminPage() {
                 {/* ROLE SUBDIVISION PILLS */}
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "0.4rem 0.5rem", borderRadius: "24px", border: "1px solid var(--border-subtle)", flexWrap: "wrap", width: "fit-content" }}>
                   {[
-                    { id: "ALL", label: "All Accounts", Icon: Globe, count: nonAdminUsers.length },
-                    { id: "STUDENT", label: "Students", Icon: GraduationCap, count: nonAdminUsers.filter((u) => u.role === "STUDENT").length },
-                    { id: "FACULTY", label: "Teachers / Faculty", Icon: Briefcase, count: nonAdminUsers.filter((u) => u.role === "FACULTY").length },
-                    { id: "HOD", label: "HODs", Icon: UserCircle, count: nonAdminUsers.filter((u) => u.role === "HOD").length },
+                    { id: "ALL", label: "All Accounts", Icon: Globe, count: allDisplayUsers.length },
+                    { id: "STUDENT", label: "Students", Icon: GraduationCap, count: allDisplayUsers.filter((u) => u.role === "STUDENT").length },
+                    { id: "FACULTY", label: "Teachers / Faculty", Icon: Briefcase, count: allDisplayUsers.filter((u) => u.role === "FACULTY").length },
+                    { id: "HOD", label: "HODs", Icon: UserCircle, count: allDisplayUsers.filter((u) => u.role === "HOD").length },
+                    { id: "ADMIN", label: "Administrators", Icon: Shield, count: allDisplayUsers.filter((u) => u.role === "ADMIN").length },
                   ].map((sub) => (
                     <button
                       key={sub.id}
@@ -932,18 +1133,67 @@ export default function AdminPage() {
                   <button onClick={() => setShowDeptModal(true)} className="btn-sky">+ Create Department</button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
-                  {depts.map((d, idx) => (
-                    <div key={d.id || d.code || `dept-${idx}`} style={{ backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "800", letterSpacing: "0.05em" }}>{d.code}</div>
-                        <h3 style={{ fontSize: "1.2rem", fontWeight: "600", margin: "0.25rem 0 0.5rem 0" }}>{d.name}</h3>
-                        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>HOD: {d.hodName || "Not Assigned"}</p>
+                  {depts.map((d, idx) => {
+                    const linkedHodUser = users.find((u) => {
+                      if (!d.hodName && !u.vmNo) return false;
+                      const matchName = d.hodName && u.name.toLowerCase().trim() === d.hodName.toLowerCase().trim();
+                      const matchHodDept = (u.role === "HOD" || u.hodProfile) && (u.hodProfile?.department === d.code || (u as any).department === d.code);
+                      return matchName || matchHodDept;
+                    });
+
+                    return (
+                      <div key={d.id || d.code || `dept-${idx}`} style={{ backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "800", letterSpacing: "0.05em" }}>{d.code}</span>
+                            {linkedHodUser && (
+                              <span style={{ fontSize: "0.7rem", padding: "0.1rem 0.45rem", borderRadius: "4px", backgroundColor: "rgba(10, 102, 194, 0.12)", color: "var(--royal-blue)", fontWeight: "700" }}>
+                                Linked Account
+                              </span>
+                            )}
+                          </div>
+                          <h3 style={{ fontSize: "1.2rem", fontWeight: "600", margin: "0.25rem 0 0.75rem 0" }}>{d.name}</h3>
+
+                          {linkedHodUser ? (
+                            <div 
+                              onClick={() => setSelectedUser(linkedHodUser)}
+                              title="Click to view HOD profile details"
+                              style={{ 
+                                display: "flex", 
+                                alignItems: "center", 
+                                gap: "0.6rem", 
+                                padding: "0.5rem 0.75rem", 
+                                backgroundColor: "var(--bg-input)", 
+                                borderRadius: "8px", 
+                                border: "1px solid var(--border-subtle)",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease"
+                              }}
+                            >
+                              <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "var(--royal-blue)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "0.85rem" }}>
+                                {linkedHodUser.name.charAt(0)}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "var(--text-main)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {linkedHodUser.name}
+                                </div>
+                                <div style={{ fontSize: "0.725rem", color: "var(--text-muted)" }}>
+                                  MTS: {linkedHodUser.vmNo || "N/A"} • {linkedHodUser.email}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>
+                              HOD: <strong style={{ color: "var(--text-main)" }}>{d.hodName || "Not Assigned"}</strong>
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end" }}>
+                          <button onClick={() => handleDeleteDept(d.id)} style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", padding: "0.25rem 0.6rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600", cursor: "pointer" }}>Delete Department</button>
+                        </div>
                       </div>
-                      <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end" }}>
-                        <button onClick={() => handleDeleteDept(d.id)} style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", padding: "0.25rem 0.6rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600", cursor: "pointer" }}>Delete Department</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -954,6 +1204,10 @@ export default function AdminPage() {
                 mode="admin"
                 departments={depts}
                 onCourseUpdated={fetchData}
+                onNavigateToAllocation={(course) => {
+                  setTargetAllocationCourse(course);
+                  setActiveTab("teacher-allocations");
+                }}
               />
             )}
 
@@ -961,7 +1215,12 @@ export default function AdminPage() {
             {activeTab === "teacher-allocations" && (
               <TeacherSubjectAllocation
                 departments={depts}
+                initialTargetCourse={targetAllocationCourse}
                 onCourseUpdated={fetchData}
+                onBackToCatalog={() => {
+                  setTargetAllocationCourse(null);
+                  setActiveTab("subjects");
+                }}
                 onTimetableGenerated={(targetClassId) => {
                   fetchData();
                   // Switch to timetable tab to view generated timetable
@@ -979,35 +1238,204 @@ export default function AdminPage() {
             {/* NOTICES */}
             {activeTab === "notices" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                  <div><h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>System Announcements</h3><p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>Broadcast official notices across student & faculty views</p></div>
-                  <button onClick={() => setShowNoticeModal(true)} className="btn-sky">+ Create Notice</button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.2rem", fontWeight: "700", margin: 0, color: "var(--text-main)" }}>
+                      Campus Announcements & Notices ({notices.length})
+                    </h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0.25rem 0 0 0" }}>
+                      Central repository of all announcements posted by Admins, HODs, and Faculty across departments.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setShowNoticeModal(true)} 
+                    className="btn-sky"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.55rem 1.1rem",
+                      borderRadius: "20px",
+                      fontWeight: "700",
+                      fontSize: "0.875rem"
+                    }}
+                  >
+                    + Create Announcement
+                  </button>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem" }}>
-                  {notices.map((n) => (
-                    <div key={n.id} style={{ backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", borderRadius: "4px", fontWeight: "700", backgroundColor: n.category === "URGENT" ? "rgba(239,68,68,0.2)" : n.category === "EXAM" ? "rgba(245,158,11,0.2)" : "rgba(59,130,246,0.2)", color: n.category === "URGENT" ? "#ef4444" : n.category === "EXAM" ? "#d97706" : "var(--royal-blue)" }}>{n.category}</span>
-                            {n.audience && (
-                              <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem", borderRadius: "4px", backgroundColor: "var(--bg-input)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
-                                {n.audience}
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{new Date(n.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "0.5rem" }}>{n.title}</h3>
 
-                        <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: "1.5" }}>{n.content}</p>
-                      </div>
-                      <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end" }}>
-                        <button onClick={() => handleDeleteNotice(n.id)} style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", padding: "0.25rem 0.6rem", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600", cursor: "pointer" }}>Delete Notice</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {notices.length === 0 ? (
+                  <div style={{ 
+                    backgroundColor: "var(--bg-card)", 
+                    padding: "3rem 2rem", 
+                    borderRadius: "12px", 
+                    border: "1px solid var(--border-subtle)", 
+                    textAlign: "center" 
+                  }}>
+                    <Megaphone size={40} style={{ color: "var(--text-muted)", margin: "0 auto 1rem auto", opacity: 0.6 }} />
+                    <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", color: "var(--text-main)" }}>No announcements published yet</h4>
+                    <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      Announcements posted by HODs, Faculty, or Admins will appear here in real-time.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.25rem" }}>
+                    {notices.map((n) => {
+                      const authorName = n.author?.name || n.postedBy || "Administrator";
+                      const authorRole = n.author?.role || (n.postedBy?.toUpperCase().includes("HOD") ? "HOD" : n.postedBy?.toUpperCase().includes("FACULTY") ? "FACULTY" : "ADMIN");
+                      const authorEmail = n.author?.email;
+
+                      const roleBadgeBg = authorRole === "HOD" ? "rgba(245, 158, 11, 0.15)" : authorRole === "FACULTY" ? "rgba(16, 185, 129, 0.15)" : "rgba(29, 78, 216, 0.15)";
+                      const roleBadgeColor = authorRole === "HOD" ? "#d97706" : authorRole === "FACULTY" ? "#059669" : "var(--royal-blue)";
+
+                      return (
+                        <div 
+                          key={n.id} 
+                          style={{ 
+                            backgroundColor: "var(--bg-card)", 
+                            padding: "1.35rem", 
+                            borderRadius: "12px", 
+                            border: "1px solid var(--border-subtle)", 
+                            boxShadow: "var(--shadow-card)", 
+                            display: "flex", 
+                            flexDirection: "column", 
+                            justifyContent: "space-between",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          <div>
+                            {/* Card Header: Category, Audience, Department, Date */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.85rem", gap: "0.5rem" }}>
+                              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
+                                <span style={{ 
+                                  fontSize: "0.72rem", 
+                                  padding: "0.2rem 0.55rem", 
+                                  borderRadius: "6px", 
+                                  fontWeight: "700", 
+                                  letterSpacing: "0.03em",
+                                  backgroundColor: n.category === "URGENT" ? "rgba(239,68,68,0.2)" : n.category === "EXAM" ? "rgba(245,158,11,0.2)" : "rgba(59,130,246,0.15)", 
+                                  color: n.category === "URGENT" ? "#ef4444" : n.category === "EXAM" ? "#d97706" : "var(--royal-blue)" 
+                                }}>
+                                  {n.category}
+                                </span>
+
+                                {n.audience && (
+                                  <span style={{ 
+                                    fontSize: "0.72rem", 
+                                    padding: "0.2rem 0.55rem", 
+                                    borderRadius: "6px", 
+                                    fontWeight: "600",
+                                    backgroundColor: "var(--bg-card-header)", 
+                                    color: "var(--text-muted)", 
+                                    border: "1px solid var(--border-subtle)" 
+                                  }}>
+                                    👥 {n.audience}
+                                  </span>
+                                )}
+
+                                {n.department && (
+                                  <span style={{ 
+                                    fontSize: "0.72rem", 
+                                    padding: "0.2rem 0.55rem", 
+                                    borderRadius: "6px", 
+                                    fontWeight: "700",
+                                    backgroundColor: "rgba(56, 189, 248, 0.12)", 
+                                    color: "var(--sky-blue)", 
+                                    border: "1px solid rgba(56, 189, 248, 0.25)" 
+                                  }}>
+                                    🏛️ {n.department}
+                                  </span>
+                                )}
+
+                                {n.targetStudentId && (
+                                  <span style={{ 
+                                    fontSize: "0.72rem", 
+                                    padding: "0.2rem 0.55rem", 
+                                    borderRadius: "6px", 
+                                    fontWeight: "600",
+                                    backgroundColor: "rgba(168, 85, 247, 0.12)", 
+                                    color: "#9333ea", 
+                                    border: "1px solid rgba(168, 85, 247, 0.25)" 
+                                  }}>
+                                    🎯 {n.targetStudentId}
+                                  </span>
+                                )}
+                              </div>
+
+                              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                                {new Date(n.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                              </span>
+                            </div>
+
+                            {/* Title & Body */}
+                            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", marginBottom: "0.5rem", color: "var(--text-main)", lineHeight: "1.4" }}>
+                              {n.title}
+                            </h3>
+
+                            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: "1.55", margin: 0, whiteSpace: "pre-wrap" }}>
+                              {n.content}
+                            </p>
+                          </div>
+
+                          {/* Card Footer: Posted By author details + Delete Notice */}
+                          <div style={{ marginTop: "1.25rem", paddingTop: "0.85rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                              <span style={{ 
+                                padding: "0.2rem 0.5rem", 
+                                borderRadius: "4px", 
+                                fontSize: "0.7rem", 
+                                fontWeight: "800", 
+                                letterSpacing: "0.04em",
+                                backgroundColor: roleBadgeBg, 
+                                color: roleBadgeColor 
+                              }}>
+                                {authorRole}
+                              </span>
+                              <div style={{ display: "flex", flexDirection: "column" }}>
+                                <span style={{ fontSize: "0.8rem", fontWeight: "600", color: "var(--text-main)" }}>
+                                  {authorName}
+                                </span>
+                                {authorEmail && (
+                                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                                    {authorEmail}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button 
+                              onClick={() => handleDeleteNotice(n.id)} 
+                              style={{ 
+                                backgroundColor: "rgba(239,68,68,0.12)", 
+                                color: "#ef4444", 
+                                border: "1px solid rgba(239,68,68,0.25)", 
+                                padding: "0.35rem 0.75rem", 
+                                borderRadius: "6px", 
+                                fontSize: "0.78rem", 
+                                fontWeight: "600", 
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                transition: "all 0.15s ease"
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "#ef4444";
+                                e.currentTarget.style.color = "#ffffff";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.12)";
+                                e.currentTarget.style.color = "#ef4444";
+                              }}
+                            >
+                              <Trash2 size={13} /> Delete Notice
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1146,17 +1574,69 @@ export default function AdminPage() {
                       </button>
                     )}
 
+                    {timetableMode === "class" && (
+                      <button 
+                        onClick={async () => {
+                          setLoadingHistory(true);
+                          setShowHistoryModal(true);
+                          const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
+                          try {
+                            const res = await fetch(`/api/admin/timetable?classId=${encodeURIComponent(classId)}&history=true`).then(r => r.json());
+                            if (res.success) {
+                              setTimetableHistoryVersions(res.versions || []);
+                              if (res.versions && res.versions.length > 0) {
+                                setSelectedHistoryVersion(res.versions[0]);
+                              } else {
+                                setSelectedHistoryVersion(null);
+                              }
+                            } else {
+                              alert("Failed to load history: " + res.error);
+                            }
+                          } catch (e: any) {
+                            alert("Error loading history: " + e.message);
+                          } finally {
+                            setLoadingHistory(false);
+                          }
+                        }}
+                        style={{ 
+                          padding: "0.4rem 0.85rem", 
+                          borderRadius: "8px", 
+                          border: "1px solid var(--border-subtle)", 
+                          backgroundColor: "rgba(56, 189, 248, 0.12)", 
+                          color: "var(--sky-blue)", 
+                          cursor: "pointer",
+                          fontWeight: "600",
+                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem"
+                        }}
+                      >
+                        <History size={16} /> Timetable History
+                      </button>
+                    )}
+
                     {timetable.length > 0 && timetableMode === "class" && !timetableCalendarView && (
                       <button onClick={async () => {
                         if (isEditingTimetable) {
                           setLoadingTimetable(true);
                           const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
+                          const semNumber = selectedYear === "I" ? 1 : selectedYear === "II" ? 3 : selectedYear === "III" ? 5 : 7;
                           const res = await fetch("/api/admin/timetable", {
                             method: "PUT",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ classId, entries: timetable })
+                            body: JSON.stringify({ 
+                              classId, 
+                              entries: timetable,
+                              academicYear: "2026-2027",
+                              semester: semNumber,
+                              changeReason: "Admin Manual Schedule Revision / Year-Sem Update"
+                            })
                           }).then(r => r.json());
-                          if(res.success) { alert("Timetable updated!"); setIsEditingTimetable(false); }
+                          if(res.success) { 
+                            alert(`Timetable updated! Previous timetable archived to history (${res.historyArchived || 0} periods preserved in history).`); 
+                            setIsEditingTimetable(false); 
+                          }
                           else { alert("Failed to update: " + res.error); }
                           setLoadingTimetable(false);
                         } else {
@@ -1164,7 +1644,7 @@ export default function AdminPage() {
                         }
                       }} className={isEditingTimetable ? "btn-royal" : "btn-sky"}>
                         <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                          {isEditingTimetable ? <><Save size={16} /> Save Changes</> : <><Edit size={16} /> Edit Timetable</>}
+                          {isEditingTimetable ? <><Save size={16} /> Save Changes (Archives to History)</> : <><Edit size={16} /> Edit Timetable</>}
                         </span>
                       </button>
                     )}
@@ -1528,7 +2008,7 @@ export default function AdminPage() {
                         <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>System Audit Trail</h3>
                         <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>Real-time logs of administrative actions, user modifications, and security events</p>
                       </div>
-                      <button onClick={fetchData} className="btn-sky" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
+                      <button onClick={() => fetchData()} className="btn-sky" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
                         🔄 Refresh Logs
                       </button>
                     </div>
@@ -1925,20 +2405,21 @@ export default function AdminPage() {
                         if (!foundSubject || !foundSubject.scheduleSlots) return foundSubject?.classesTaking || [];
 
                         // Filter schedule slots specifically handled by this teacher
-                        const teacherNameLower = (selectedUser.name || "").toLowerCase();
-                        const vmNoStr = selectedUser.vmNo || fp.vmNo || "";
+                        const teacherNameLower = (selectedUser.name || "").toLowerCase().trim();
+                        const vmNoStr = (selectedUser.vmNo || fp.vmNo || "").trim();
+                        
                         const matchingSlots = foundSubject.scheduleSlots.filter((slot: any) => {
                           const fn = (slot.facultyName || "").toLowerCase();
-                          return (
-                            (fn && (fn.includes(teacherNameLower) || teacherNameLower.includes(fn))) ||
-                            (vmNoStr && fn.includes(vmNoStr))
-                          );
+                          const staffList = fn.split(/[,/]+/).map((s: string) => s.trim());
+                          const isNameMatch = staffList.some((s: string) => s === teacherNameLower || s.includes(teacherNameLower) || teacherNameLower.includes(s));
+                          const isVmMatch = vmNoStr && fn.includes(vmNoStr);
+                          return isNameMatch || isVmMatch;
                         });
 
                         if (matchingSlots.length > 0) {
                           return Array.from(new Set(matchingSlots.map((s: any) => s.classId).filter(Boolean)));
                         }
-                        return foundSubject.classesTaking || [];
+                        return [];
                       };
 
                       const coreSubjects = [
@@ -2252,15 +2733,162 @@ export default function AdminPage() {
 
       {showDeptModal && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal">
-            <h3 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Create New Department</h3>
+          <div className="admin-modal" style={{ maxWidth: "520px" }}>
+            <h3 style={{ fontSize: "1.25rem", marginBottom: "0.25rem" }}>Create New Department</h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+              Link an HOD using their MTS / VM Number to automatically sync their details from their user profile.
+            </p>
             <form onSubmit={handleCreateDept} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <input type="text" placeholder="Dept Code (e.g. AI-DS)" value={newDeptCode} onChange={(e) => setNewDeptCode(e.target.value)} required className="premium-input" />
-              <input type="text" placeholder="Full Department Name" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} required className="premium-input" />
-              <input type="text" placeholder="HOD Name (Optional)" value={newDeptHod} onChange={(e) => setNewDeptHod(e.target.value)} className="premium-input" />
-              <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <div>
+                <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem", display: "block" }}>
+                  Department Code *
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. AI-DS, ECE, MECH" 
+                  value={newDeptCode} 
+                  onChange={(e) => setNewDeptCode(e.target.value.toUpperCase())} 
+                  required 
+                  className="premium-input" 
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem", display: "block" }}>
+                  Full Department Name *
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Artificial Intelligence and Data Science" 
+                  value={newDeptName} 
+                  onChange={(e) => setNewDeptName(e.target.value)} 
+                  required 
+                  className="premium-input" 
+                />
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
+                <label style={{ fontSize: "0.75rem", color: "var(--sky-blue)", fontWeight: "700", marginBottom: "0.3rem", display: "block" }}>
+                  HOD MTS / VM Number (Account Link)
+                </label>
+                
+                {/* Select from existing Faculty / HOD users or type custom MTS No */}
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <select 
+                    value={newDeptHodVmNo} 
+                    onChange={(e) => {
+                      const selectedVal = e.target.value;
+                      setNewDeptHodVmNo(selectedVal);
+                      const matched = users.find((u) => u.vmNo && u.vmNo.trim().toLowerCase() === selectedVal.trim().toLowerCase());
+                      if (matched) {
+                        setNewDeptHod(matched.name);
+                      }
+                    }} 
+                    className="premium-input" 
+                    style={{ flex: 1.2 }}
+                  >
+                    <option value="">-- Choose User by MTS / VM No --</option>
+                    {users
+                      .filter((u) => u.vmNo && (u.role === "HOD" || u.role === "FACULTY"))
+                      .map((u) => (
+                        <option key={u.id} value={u.vmNo!}>
+                          {u.vmNo} - {u.name} ({u.role})
+                        </option>
+                      ))}
+                  </select>
+                  
+                  <input 
+                    type="text" 
+                    placeholder="Or type MTS No" 
+                    value={newDeptHodVmNo} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewDeptHodVmNo(val);
+                      const matched = users.find((u) => u.vmNo && u.vmNo.trim().toLowerCase() === val.trim().toLowerCase());
+                      if (matched) {
+                        setNewDeptHod(matched.name);
+                      }
+                    }} 
+                    className="premium-input" 
+                    style={{ flex: 0.8 }} 
+                  />
+                </div>
+
+                {/* Auto-synced HOD Profile Card Preview */}
+                {(() => {
+                  const matchedUser = users.find((u) => u.vmNo && u.vmNo.trim().toLowerCase() === newDeptHodVmNo.trim().toLowerCase());
+                  if (matchedUser) {
+                    return (
+                      <div style={{ 
+                        backgroundColor: "rgba(10, 102, 194, 0.08)", 
+                        border: "1px solid rgba(10, 102, 194, 0.25)", 
+                        borderRadius: "8px", 
+                        padding: "0.75rem", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "0.75rem",
+                        marginTop: "0.5rem"
+                      }}>
+                        <div style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "50%",
+                          backgroundColor: "var(--royal-blue)",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: "700",
+                          fontSize: "0.9rem"
+                        }}>
+                          {matchedUser.name.charAt(0)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <strong style={{ fontSize: "0.85rem", color: "var(--text-main)" }}>{matchedUser.name}</strong>
+                            <span style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem", borderRadius: "4px", backgroundColor: "rgba(10, 102, 194, 0.15)", color: "var(--royal-blue)", fontWeight: "700" }}>
+                              {matchedUser.role}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block" }}>
+                            {matchedUser.email} • MTS No: {matchedUser.vmNo}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.5rem" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                        Auto-detected HOD Name (or type manually if account is being created later):
+                      </span>
+                      <input 
+                        type="text" 
+                        placeholder="HOD Full Name (e.g. Dr. K. Muthukannan)" 
+                        value={newDeptHod} 
+                        onChange={(e) => setNewDeptHod(e.target.value)} 
+                        className="premium-input" 
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
                 <button type="submit" className="btn-sky" style={{ flex: 1 }}>Create Department</button>
-                <button type="button" onClick={() => setShowDeptModal(false)} style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "var(--text-main)", padding: "0.75rem 1rem", borderRadius: "8px", border: "none" }}>Cancel</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowDeptModal(false);
+                    setNewDeptCode("");
+                    setNewDeptName("");
+                    setNewDeptHod("");
+                    setNewDeptHodVmNo("");
+                  }} 
+                  style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "var(--text-main)", padding: "0.75rem 1rem", borderRadius: "8px", border: "none", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
@@ -2293,6 +2921,15 @@ export default function AdminPage() {
                     <option value="URGENT">URGENT</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "block" }}>Target Department (Optional)</label>
+                <select value={newNoticeDept} onChange={(e) => setNewNoticeDept(e.target.value)} className="premium-input" style={{ width: "100%" }}>
+                  <option value="">All Departments (Campus-wide)</option>
+                  {depts.map((d) => (
+                    <option key={d.id} value={d.code}>{d.code} - {d.name}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
 
@@ -2557,6 +3194,198 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      {/* TIMETABLE HISTORY MODAL */}
+      {showHistoryModal && (
+        <div 
+          className="admin-modal-overlay" 
+          onClick={() => setShowHistoryModal(false)}
+          style={{ zIndex: 1100 }}
+        >
+          <div 
+            className="admin-modal" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              maxWidth: "1100px", 
+              width: "95vw", 
+              maxHeight: "90vh", 
+              overflowY: "auto", 
+              padding: "1.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ width: "40px", height: "40px", borderRadius: "10px", backgroundColor: "rgba(56, 189, 248, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sky-blue)" }}>
+                  <History size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: "700", margin: 0, color: "var(--text-main)" }}>
+                    Timetable History & Archival Log
+                  </h3>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0.2rem 0 0 0" }}>
+                    Class: <strong style={{ color: "var(--sky-blue)" }}>{selectedYear}-{selectedDept}-{selectedSection}</strong> • Preserves old semester & academic year timetables prior to updates
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowHistoryModal(false)}
+                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "0.4rem" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {loadingHistory ? (
+              <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+                <Loader2 size={30} className="animate-spin" style={{ margin: "0 auto 1rem auto" }} />
+                Loading archived timetable snapshots...
+              </div>
+            ) : timetableHistoryVersions.length === 0 ? (
+              <div style={{ padding: "3rem 1.5rem", textAlign: "center", backgroundColor: "var(--bg-card-header)", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
+                <History size={36} color="var(--sky-blue)" style={{ margin: "0 auto 1rem auto", opacity: 0.7 }} />
+                <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", color: "var(--text-main)" }}>
+                  No Timetable History Recorded Yet
+                </h4>
+                <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)", maxWidth: "500px", marginInline: "auto" }}>
+                  Whenever this class's timetable is updated, edited, or advanced to a new semester/year, the existing schedule is automatically archived here first before writing to the master timetable.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {/* Version Selector Tabs */}
+                <div>
+                  <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.4rem", display: "block" }}>
+                    Archived Snapshots ({timetableHistoryVersions.length} versions saved)
+                  </label>
+                  <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
+                    {timetableHistoryVersions.map((v, idx) => {
+                      const isSelected = selectedHistoryVersion?.versionId === v.versionId;
+                      const dateStr = v.archivedAt ? new Date(v.archivedAt).toLocaleString() : `Snapshot #${idx + 1}`;
+                      return (
+                        <button
+                          key={v.versionId}
+                          onClick={() => setSelectedHistoryVersion(v)}
+                          style={{
+                            padding: "0.5rem 0.85rem",
+                            borderRadius: "8px",
+                            border: isSelected ? "1px solid var(--sky-blue)" : "1px solid var(--border-subtle)",
+                            backgroundColor: isSelected ? "rgba(56, 189, 248, 0.15)" : "var(--bg-card-header)",
+                            color: isSelected ? "var(--sky-blue)" : "var(--text-main)",
+                            cursor: "pointer",
+                            fontSize: "0.8rem",
+                            fontWeight: isSelected ? "700" : "500",
+                            whiteSpace: "nowrap",
+                            textAlign: "left"
+                          }}
+                        >
+                          <div>📅 {dateStr}</div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                            {v.changeReason || "Archived Schedule"} • {v.entriesCount} periods
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected Version Details & Schedule Matrix */}
+                {selectedHistoryVersion && (
+                  <div style={{ backgroundColor: "var(--bg-card)", padding: "1.25rem", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <div>
+                        <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "var(--text-main)" }}>
+                          {selectedHistoryVersion.changeReason || "Archived Snapshot"}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                          Archived on: {new Date(selectedHistoryVersion.archivedAt).toLocaleString()} • Archived By: {selectedHistoryVersion.archivedBy || "System Admin"}
+                          {selectedHistoryVersion.semester ? ` • Semester: ${selectedHistoryVersion.semester}` : ""}
+                          {selectedHistoryVersion.academicYear ? ` • Academic Year: ${selectedHistoryVersion.academicYear}` : ""}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Restore this archived timetable snapshot (${selectedHistoryVersion.entries?.length || 0} periods) back to the active master timetable for ${selectedYear}-${selectedDept}-${selectedSection}? The current active timetable will be saved to history first.`)) return;
+                          setLoadingTimetable(true);
+                          setShowHistoryModal(false);
+                          const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
+                          try {
+                            const res = await fetch("/api/admin/timetable", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                classId,
+                                entries: selectedHistoryVersion.entries || [],
+                                academicYear: selectedHistoryVersion.academicYear,
+                                semester: selectedHistoryVersion.semester,
+                                changeReason: `Restored from History Snapshot (${selectedHistoryVersion.versionId})`
+                              })
+                            }).then(r => r.json());
+                            if (res.success) {
+                              alert(`Successfully restored timetable from snapshot! (${res.count} periods restored, old timetable archived to history).`);
+                              setTimetable(selectedHistoryVersion.entries || []);
+                            } else {
+                              alert("Failed to restore: " + res.error);
+                            }
+                          } catch (err: any) {
+                            alert("Restore error: " + err.message);
+                          } finally {
+                            setLoadingTimetable(false);
+                          }
+                        }}
+                        className="btn-sky"
+                        style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem" }}
+                      >
+                        Restore This Version to Master Timetable
+                      </button>
+                    </div>
+
+                    {/* Table View of Historical Snapshot */}
+                    <div className="responsive-table-wrapper">
+                      <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.82rem", minWidth: "800px" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)", color: "var(--text-muted)" }}>
+                            <th style={{ padding: "0.75rem", width: "70px" }}>Day</th>
+                            {[1,2,3,4,5,6,7,8].map(p => <th key={p} style={{ padding: "0.75rem" }}>Period {p}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {["I", "II", "III", "IV", "V"].map(day => (
+                            <tr key={day} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                              <td style={{ padding: "0.75rem", fontWeight: "700", borderRight: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-card-header)" }}>Day {day}</td>
+                              {[1,2,3,4,5,6,7,8].map(period => {
+                                const matching = (selectedHistoryVersion.entries || []).filter((e: any) => e.dayOrder === day && e.period === period);
+                                return (
+                                  <td key={period} style={{ padding: "0.5rem", borderRight: "1px solid var(--border-subtle)", verticalAlign: "top" }}>
+                                    {matching.length > 0 ? (
+                                      matching.map((m: any, mIdx: number) => (
+                                        <div key={mIdx} style={{ display: "flex", flexDirection: "column", gap: "0.15rem", marginBottom: matching.length > 1 ? "0.3rem" : "0" }}>
+                                          <strong style={{ color: "var(--sky-blue)", fontSize: "0.8rem" }}>{m.subjectName || m.subjectCode || "-"}</strong>
+                                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{m.facultyName || "No Faculty"}</span>
+                                          {m.roomNo && <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>Room: {m.roomNo}</span>}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <span style={{ color: "var(--border-subtle)", fontSize: "0.75rem" }}>-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <AdminAgentChat onTimetableUpdated={fetchData} />
     </div>
   );

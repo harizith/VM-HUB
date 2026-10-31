@@ -101,8 +101,26 @@ export default function DashboardPage() {
             <div style={{ fontSize: "0.85rem", fontWeight: "700", letterSpacing: "0.05em", color: "rgba(255,255,255,0.7)", marginBottom: "0.5rem" }}>HAPPENING NOW</div>
             <h2 style={{ fontSize: "1.8rem", fontWeight: "700", margin: "0 0 1rem 0", color: "#fff" }}>{happeningNow ? happeningNow.subjectName : "Free Period"}</h2>
             {happeningNow && (
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem", fontSize: "0.9rem", color: "#fff" }}>
-                <span style={{ backgroundColor: "rgba(255,255,255,0.2)", padding: "0.2rem 0.6rem", borderRadius: "6px", fontWeight: "600" }}>{happeningNow.facultyName}</span>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.6rem", fontSize: "0.9rem", color: "#fff" }}>
+                {(() => {
+                  const staffList = (happeningNow.facultyName || "").split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+                  const isLab = (happeningNow.subjectName || "").toLowerCase().includes("lab");
+                  const isElec = (happeningNow.subjectName || "").toLowerCase().includes("elective");
+
+                  if (staffList.length > 1) {
+                    return (
+                      <span style={{ backgroundColor: "rgba(255,255,255,0.22)", padding: "0.2rem 0.65rem", borderRadius: "6px", fontWeight: "600", fontSize: "0.82rem" }}>
+                        {isLab ? "Lab Staff: " : isElec ? "Elective Faculty: " : "Faculty: "}
+                        {staffList.join(" • ")}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span style={{ backgroundColor: "rgba(255,255,255,0.2)", padding: "0.2rem 0.6rem", borderRadius: "6px", fontWeight: "600" }}>
+                      {happeningNow.facultyName || "Faculty"}
+                    </span>
+                  );
+                })()}
                 <span>Room {happeningNow.roomNo}</span>
               </div>
             )}
@@ -116,8 +134,22 @@ export default function DashboardPage() {
             <h3 style={{ fontSize: "1.25rem", fontWeight: "800", color: "var(--text-main)", margin: "0 0 0.5rem 0" }}>{upNext ? upNext.subjectName : "No Classes Scheduled"}</h3>
             {upNext && (
               <>
-                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span>{upNext.facultyName}</span>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  {(() => {
+                    const staffList = (upNext.facultyName || "").split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+                    const isLab = (upNext.subjectName || "").toLowerCase().includes("lab");
+                    const isElec = (upNext.subjectName || "").toLowerCase().includes("elective");
+
+                    if (staffList.length > 1) {
+                      return (
+                        <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+                          {isLab ? "Lab Staff: " : isElec ? "Elective Faculty: " : "Staff: "}
+                          {staffList.join(" • ")}
+                        </span>
+                      );
+                    }
+                    return <span>{upNext.facultyName || "Faculty"}</span>;
+                  })()}
                 </div>
                 <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
                   {upNext.roomNo}

@@ -41,6 +41,43 @@ export async function GET(request: Request) {
     const classId = searchParams.get('classId');
     const facultyName = searchParams.get('facultyName');
     const listOptions = searchParams.get('list');
+    const viewHistory = searchParams.get('history') === 'true';
+
+    // Query historical snapshots for a class or all classes
+    if (viewHistory) {
+      const historyWhere: any = {};
+      if (classId) {
+        historyWhere.classId = { in: getClassAliases(classId) };
+      }
+      const historyEntries = await (prisma as any).timetableHistory.findMany({
+        where: historyWhere,
+        orderBy: [{ archivedAt: 'desc' }, { dayOrder: 'asc' }, { period: 'asc' }],
+      });
+
+      // Group by versionId for convenient viewing
+      const versionsMap: Record<string, any> = {};
+      for (const entry of historyEntries) {
+        const vId = entry.versionId || 'legacy';
+        if (!versionsMap[vId]) {
+          versionsMap[vId] = {
+            versionId: vId,
+            classId: entry.classId,
+            academicYear: entry.academicYear,
+            semester: entry.semester,
+            changeReason: entry.changeReason,
+            archivedBy: entry.archivedBy,
+            archivedAt: entry.archivedAt,
+            entriesCount: 0,
+            entries: [],
+          };
+        }
+        versionsMap[vId].entriesCount += 1;
+        versionsMap[vId].entries.push(entry);
+      }
+
+      const versions = Object.values(versionsMap);
+      return NextResponse.json({ success: true, history: historyEntries, versions });
+    }
 
     // Return available options (classes & faculty) for filter dropdowns
     if (listOptions === 'options' || (!classId && !facultyName)) {
@@ -167,17 +204,58 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { classId, entries } = body;
+    const { classId, entries, academicYear, semester, changeReason } = body;
 
     if (!classId || !entries || !Array.isArray(entries)) {
       return NextResponse.json({ success: false, error: 'classId and entries array are required' }, { status: 400 });
     }
 
-    // Replace the entire timetable for the class
-    await prisma.timetableEntry.deleteMany({
-      where: { classId },
+    const aliases = getClassAliases(classId);
+
+    // 1. Fetch current existing entries to archive in history FIRST
+    const existingEntries = await prisma.timetableEntry.findMany({
+      where: { classId: { in: aliases } },
     });
 
+    let historyArchivedCount = 0;
+    if (existingEntries.length > 0) {
+      const versionId = `arch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const reason = changeReason || 'Timetable Update (Year/Semester Transition or Revision)';
+      const archBy = authorization.email || 'Admin';
+
+      try {
+        const histResult = await (prisma as any).timetableHistory.createMany({
+          data: existingEntries.map((e: any) => ({
+            versionId,
+            classId: e.classId || classId,
+            academicYear: academicYear || null,
+            semester: typeof semester === 'number' ? semester : null,
+            changeReason: reason,
+            archivedBy: archBy,
+            dayOrder: e.dayOrder,
+            period: e.period,
+            timeRange: e.timeRange,
+            subjectCode: e.subjectCode,
+            subjectName: e.subjectName,
+            facultyName: e.facultyName,
+            roomNo: e.roomNo,
+            vmsNo: e.vmsNo,
+            category: e.category,
+            originalCreated: e.createdAt,
+          })),
+        });
+        historyArchivedCount = histResult.count || existingEntries.length;
+      } catch (histErr: any) {
+        console.warn('Timetable history archival warning:', histErr?.message || histErr);
+      }
+    }
+
+    // 2. Clear old master timetable entries
+    await prisma.timetableEntry.deleteMany({
+      where: { classId: { in: aliases } },
+    });
+
+    // 3. Store new updated timetable entries in master timetable
     const inserted = await prisma.timetableEntry.createMany({
       data: entries.map((entry: any) => ({
         classId,
@@ -189,10 +267,27 @@ export async function PUT(request: Request) {
         facultyName: entry.facultyName || null,
         roomNo: entry.roomNo || null,
         vmsNo: typeof entry.vmsNo === 'string' ? entry.vmsNo.trim() || null : null,
+        category: entry.category || null,
       })),
     });
 
-    return NextResponse.json({ success: true, count: inserted.count });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: 'TIMETABLE_UPDATE_WITH_HISTORY',
+          details: `Updated schedule for ${classId} (${inserted.count} periods active). Archived ${historyArchivedCount} previous periods to history.`,
+          performedBy: authorization.email || 'Admin',
+        },
+      });
+    } catch {
+      // Audit log non-blocking
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      count: inserted.count, 
+      historyArchived: historyArchivedCount 
+    });
   } catch (error: any) {
     console.error('Failed to update timetable:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

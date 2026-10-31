@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { code, name, hodName } = body;
+    const { code, name, hodName, hodVmNo } = body;
 
     if (!code || !name) {
       return NextResponse.json({ success: false, error: "Department Code and Name are required" }, { status: 400 });
@@ -30,7 +30,46 @@ export async function POST(req: Request) {
 
     const cleanCode = code.toUpperCase().trim();
     const cleanName = name.trim();
-    const cleanHod = hodName ? hodName.trim() : null;
+    const cleanHodVmNo = hodVmNo ? String(hodVmNo).trim() : null;
+    let cleanHod = hodName ? String(hodName).trim() : null;
+
+    // If an MTS No / VM No is provided, look up the user account to fetch actual name and profile info
+    let hodUser: any = null;
+    if (cleanHodVmNo) {
+      try {
+        hodUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { vmNo: cleanHodVmNo },
+              { vmNo: { equals: cleanHodVmNo, mode: "insensitive" } },
+            ],
+          },
+        });
+      } catch (e) {
+        console.warn("Error finding user by vmNo:", e);
+      }
+    }
+
+    // Fallback: If no match by VM No but hodName given, try matching user by name or email
+    if (!hodUser && cleanHod) {
+      try {
+        hodUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { name: { equals: cleanHod, mode: "insensitive" } },
+              { email: { equals: cleanHod.toLowerCase(), mode: "insensitive" } },
+            ],
+          },
+        });
+      } catch (e) {
+        console.warn("Error finding user by name:", e);
+      }
+    }
+
+    // If matching user found, use their official name from user profile
+    if (hodUser) {
+      cleanHod = hodUser.name;
+    }
 
     const existing = await prisma.department.findUnique({
       where: { code: cleanCode },
@@ -48,9 +87,51 @@ export async function POST(req: Request) {
       },
     });
 
+    // If an associated user was found or provided with a VM No, connect or update their HOD role and HodProfile
+    if (hodUser && hodUser.vmNo) {
+      try {
+        // Upgrade role to HOD if not already ADMIN/HOD
+        if (hodUser.role !== "ADMIN") {
+          await prisma.user.update({
+            where: { id: hodUser.id },
+            data: { role: "HOD" },
+          });
+          try {
+            await prisma.userMode.upsert({
+              where: { vmno: hodUser.vmNo },
+              update: { usermode: "HOD" },
+              create: {
+                vmno: hodUser.vmNo,
+                emailid: hodUser.email,
+                password: hodUser.password,
+                usermode: "HOD",
+              },
+            });
+          } catch {}
+        }
+
+        // Upsert HodProfile connecting the HOD's MTS No to this department
+        await prisma.hodProfile.upsert({
+          where: { vmNo: hodUser.vmNo },
+          update: {
+            department: cleanCode,
+            designation: `Head of Department (${cleanCode})`,
+          },
+          create: {
+            vmNo: hodUser.vmNo,
+            department: cleanCode,
+            designation: `Head of Department (${cleanCode})`,
+          },
+        });
+      } catch (profileErr) {
+        console.warn("Could not auto-link HOD profile:", profileErr);
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
-      department: newDept 
+      department: newDept,
+      hodUser: hodUser ? { name: hodUser.name, vmNo: hodUser.vmNo, email: hodUser.email } : null,
     });
   } catch (error: any) {
     console.error("Error creating department:", error);

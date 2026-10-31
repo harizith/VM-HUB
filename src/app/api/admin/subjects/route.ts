@@ -43,10 +43,68 @@ export async function GET(req: Request) {
       console.error(e);
     }
 
-    const enhancedSubjects = subjects.map((sub: { code: string; [key: string]: any }) => {
-      const related = timetableEntries.filter((t: { subjectCode: string; [key: string]: any }) => t.subjectCode.toUpperCase() === sub.code.toUpperCase());
+    // Also fetch faculty members who have this subject mapped in their profile
+    let facultyUsers: any[] = [];
+    try {
+      facultyUsers = await prisma.user.findMany({
+        where: {
+          role: { in: ["FACULTY", "HOD"] },
+          facultyProfile: { isNot: null }
+        },
+        select: {
+          name: true,
+          vmNo: true,
+          role: true,
+          facultyProfile: {
+            select: {
+              department: true,
+              designation: true,
+              subject1: true,
+              subject2: true,
+              lab1: true,
+              additional1: true,
+              additional2: true
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.error("Error fetching faculty profiles for subject enrichment:", e);
+    }
+
+    const enhancedSubjects = subjects.map((sub: { code: string; name: string; departmentCode: string; [key: string]: any }) => {
+      const subCodeUpper = (sub.code || "").toUpperCase().trim();
+      const subNameLower = (sub.name || "").toLowerCase().trim();
+
+      const related = timetableEntries.filter((t: { subjectCode: string; [key: string]: any }) => (t.subjectCode || "").toUpperCase() === subCodeUpper);
       const classesTaking = Array.from(new Set(related.map((t: { classId: string }) => t.classId).filter(Boolean)));
-      const facultiesHandling = Array.from(new Set(related.map((t: { facultyName: string }) => t.facultyName).filter(Boolean)));
+      
+      // Faculty from actual timetable schedule slots
+      const scheduledFaculties = related.map((t: { facultyName: string }) => t.facultyName).filter(Boolean);
+
+      // Faculty with profile allocations/preferences for this course
+      const profileAllocatedFaculties: string[] = [];
+      for (const u of facultyUsers) {
+        const fp = u.facultyProfile;
+        if (!fp) continue;
+        const profileSubjects = [fp.subject1, fp.subject2, fp.lab1, fp.additional1, fp.additional2]
+          .filter(Boolean)
+          .map((s: string) => s.trim().toLowerCase());
+
+        const hasMatch = profileSubjects.some((ps: string) => 
+          ps === subCodeUpper.toLowerCase() ||
+          ps === subNameLower ||
+          subNameLower.includes(ps) ||
+          ps.includes(subNameLower)
+        );
+
+        if (hasMatch && u.name) {
+          profileAllocatedFaculties.push(u.name);
+        }
+      }
+
+      // Combine both sources, eliminating duplicates
+      const facultiesHandling = Array.from(new Set([...scheduledFaculties, ...profileAllocatedFaculties]));
       const rooms = Array.from(new Set(related.map((t: { roomNo: string }) => t.roomNo).filter(Boolean)));
       const weeklyHours = related.length;
       

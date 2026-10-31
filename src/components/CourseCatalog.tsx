@@ -24,7 +24,10 @@ import {
   Building2,
   Calendar,
   MapPin,
-  GraduationCap
+  GraduationCap,
+  UserCheck,
+  UserPlus,
+  ArrowRight
 } from "lucide-react";
 
 export interface ScheduleSlot {
@@ -55,6 +58,7 @@ interface CourseCatalogProps {
   department?: string; // Initial department for HOD
   departments?: { code: string; name: string }[];
   onCourseUpdated?: () => void;
+  onNavigateToAllocation?: (course: SubjectItem) => void;
 }
 
 export default function CourseCatalog({
@@ -62,6 +66,7 @@ export default function CourseCatalog({
   department = "CSE",
   departments = [],
   onCourseUpdated,
+  onNavigateToAllocation,
 }: CourseCatalogProps) {
   const [courses, setCourses] = useState<SubjectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -937,28 +942,59 @@ export default function CourseCatalog({
                   justifyContent: "space-between",
                   alignItems: "center",
                   paddingTop: "0.75rem",
-                  borderTop: "1px solid var(--border-subtle)"
+                  borderTop: "1px solid var(--border-subtle)",
+                  flexWrap: "wrap",
+                  gap: "0.5rem"
                 }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedCourse(c);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--sky-blue)",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.3rem",
-                      cursor: "pointer",
-                      padding: 0
-                    }}
-                  >
-                    <Users size={14} /> View Allocation <ChevronRight size={14} />
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCourse(c);
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        fontSize: "0.8rem",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem",
+                        cursor: "pointer",
+                        padding: 0
+                      }}
+                    >
+                      <Users size={14} /> Details <ChevronRight size={13} />
+                    </button>
+
+                    {onNavigateToAllocation && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigateToAllocation(c);
+                        }}
+                        title={`Connect & allocate faculty for ${c.code}`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          padding: "0.25rem 0.55rem",
+                          borderRadius: "6px",
+                          border: hasStaff ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(56, 189, 248, 0.4)",
+                          backgroundColor: hasStaff ? "rgba(16, 185, 129, 0.08)" : "rgba(56, 189, 248, 0.12)",
+                          color: hasStaff ? "#10b981" : "var(--sky-blue)",
+                          fontSize: "0.75rem",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        {hasStaff ? <UserCheck size={13} /> : <UserPlus size={13} />}
+                        {hasStaff ? "Manage Staff" : "Allocate Teacher"}
+                      </button>
+                    )}
+                  </div>
 
                   <div style={{ display: "flex", gap: "0.4rem" }}>
                     <button
@@ -1119,6 +1155,31 @@ export default function CourseCatalog({
                     </td>
                     <td style={{ padding: "0.85rem 1rem", textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.4rem" }}>
+                        {onNavigateToAllocation && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateToAllocation(c);
+                            }}
+                            title={`Allocate faculty for ${c.code}`}
+                            style={{
+                              padding: "0.25rem 0.55rem",
+                              borderRadius: "4px",
+                              backgroundColor: hasStaff ? "rgba(16, 185, 129, 0.15)" : "rgba(56, 189, 248, 0.15)",
+                              color: hasStaff ? "#10b981" : "var(--sky-blue)",
+                              border: "none",
+                              fontSize: "0.75rem",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem"
+                            }}
+                          >
+                            {hasStaff ? <UserCheck size={12} /> : <UserPlus size={12} />}
+                            {hasStaff ? "Allocated" : "Allocate"}
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1127,15 +1188,15 @@ export default function CourseCatalog({
                           style={{
                             padding: "0.25rem 0.55rem",
                             borderRadius: "4px",
-                            backgroundColor: "rgba(56, 189, 248, 0.15)",
-                            color: "var(--sky-blue)",
-                            border: "none",
+                            backgroundColor: "var(--bg-input)",
+                            color: "var(--text-main)",
+                            border: "1px solid var(--border-subtle)",
                             fontSize: "0.75rem",
                             fontWeight: "600",
                             cursor: "pointer"
                           }}
                         >
-                          Staff
+                          Details
                         </button>
                         <button
                           onClick={(e) => {
@@ -1390,42 +1451,74 @@ export default function CourseCatalog({
             {/* Quick Actions at bottom */}
             <div style={{
               display: "flex",
-              gap: "0.75rem",
+              flexDirection: "column",
+              gap: "0.6rem",
               paddingTop: "1rem",
               borderTop: "1px solid var(--border-subtle)",
               marginTop: "auto"
             }}>
-              <button
-                onClick={() => handleOpenEdit(selectedCourse)}
-                style={{
-                  flex: 1,
-                  backgroundColor: "var(--bg-input)",
-                  color: "var(--text-main)",
-                  border: "1px solid var(--border-subtle)",
-                  padding: "0.75rem",
-                  borderRadius: "8px",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  fontSize: "0.85rem"
-                }}
-              >
-                Edit Subject Details
-              </button>
-              <button
-                onClick={() => setSelectedCourse(null)}
-                style={{
-                  backgroundColor: "var(--royal-blue)",
-                  color: "white",
-                  border: "none",
-                  padding: "0.75rem 1.25rem",
-                  borderRadius: "8px",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  fontSize: "0.85rem"
-                }}
-              >
-                Close
-              </button>
+              {onNavigateToAllocation && (
+                <button
+                  onClick={() => {
+                    const c = selectedCourse;
+                    setSelectedCourse(null);
+                    onNavigateToAllocation(c);
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    backgroundColor: "var(--royal-blue)",
+                    color: "white",
+                    border: "none",
+                    padding: "0.75rem",
+                    borderRadius: "8px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    boxShadow: "0 4px 12px rgba(29, 78, 216, 0.3)"
+                  }}
+                >
+                  <UserPlus size={16} /> Connect & Allocate Teachers for {selectedCourse.code}
+                  <ArrowRight size={15} />
+                </button>
+              )}
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <button
+                  onClick={() => handleOpenEdit(selectedCourse)}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "var(--bg-input)",
+                    color: "var(--text-main)",
+                    border: "1px solid var(--border-subtle)",
+                    padding: "0.65rem",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    fontSize: "0.85rem"
+                  }}
+                >
+                  Edit Subject Details
+                </button>
+                <button
+                  onClick={() => setSelectedCourse(null)}
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--border-subtle)",
+                    padding: "0.65rem 1.25rem",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    fontSize: "0.85rem"
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </aside>
         </div>

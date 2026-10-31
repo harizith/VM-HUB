@@ -9,10 +9,28 @@ export async function GET() {
   try {
     const notices = await prisma.notice.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
     });
     return NextResponse.json({ success: true, notices });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    // If include fails due to relations or fallback, fallback to standard findMany
+    try {
+      const fallbackNotices = await prisma.notice.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ success: true, notices: fallbackNotices });
+    } catch (innerError: any) {
+      return NextResponse.json({ success: false, error: innerError.message }, { status: 500 });
+    }
   }
 }
 
@@ -20,7 +38,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, content, category, audience } = body;
+    const { title, content, category, audience, department } = body;
 
     if (!title || !content) {
       return NextResponse.json({ success: false, error: "Title and Content are required" }, { status: 400 });
@@ -35,6 +53,7 @@ export async function POST(req: Request) {
         content: content.trim(),
         category: cat,
         audience: aud,
+        department: department?.trim() || null,
         postedBy: "Admin",
       },
     });

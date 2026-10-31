@@ -41,6 +41,13 @@ export async function GET() {
             additional2: true,
           },
         },
+        hodProfile: {
+          select: {
+            vmNo: true,
+            department: true,
+            designation: true,
+          },
+        },
       },
     });
 
@@ -77,98 +84,116 @@ export async function POST(req: Request) {
     const validRole = ["STUDENT", "FACULTY", "HOD", "ADMIN"].includes(role) ? role : "STUDENT";
 
     // 1. Check if user already exists
-    const existing: any[] = await prisma.$queryRaw`
-      SELECT id FROM "User" WHERE email = ${cleanEmail} LIMIT 1
-    `;
+    const existingEmail = await prisma.user.findFirst({
+      where: { email: cleanEmail },
+    });
 
-    if (existing && existing.length > 0) {
+    if (existingEmail) {
       return NextResponse.json({ success: false, error: `User with email '${cleanEmail}' already exists.` }, { status: 400 });
     }
 
     // Check if vmNo already exists
     if (cleanVmNo) {
-      const existingVm: any[] = await prisma.$queryRaw`
-        SELECT id FROM "User" WHERE "vmNo" = ${cleanVmNo} LIMIT 1
-      `;
-      if (existingVm && existingVm.length > 0) {
+      const existingVm = await prisma.user.findFirst({
+        where: { vmNo: cleanVmNo },
+      });
+      if (existingVm) {
         return NextResponse.json({ success: false, error: `User with VM No/VMS No '${cleanVmNo}' already exists.` }, { status: 400 });
       }
     }
 
-    const newId = crypto.randomUUID();
-
-    // 2. Insert user into PostgreSQL
-    await prisma.$executeRaw`
-      INSERT INTO "User" (id, email, name, password, role, status, "vmNo", "createdAt", "updatedAt")
-      VALUES (
-        ${newId},
-        ${cleanEmail},
-        ${cleanName},
-        ${storedPassword},
-        ${validRole}::"Role",
-        'ACTIVE',
-        ${cleanVmNo},
-        NOW(),
-        NOW()
-      )
-    `;
-
-    // 3. Role-specific profile creation
+    // 2. Department setup
     const dept = body.department ? String(body.department).toUpperCase().trim() : null;
     if (dept) {
-      await prisma.department.upsert({
-        where: { code: dept },
-        update: {},
-        create: { code: dept, name: `${dept} Department` },
-      });
+      try {
+        await prisma.department.upsert({
+          where: { code: dept },
+          update: {},
+          create: { code: dept, name: `${dept} Department` },
+        });
+      } catch (e) {
+        console.warn("Department upsert error:", e);
+      }
     }
+
+    // 3. Create user record via standard Prisma API
+    const createdUser = await prisma.user.create({
+      data: {
+        email: cleanEmail,
+        name: cleanName,
+        password: storedPassword,
+        role: validRole as any,
+        status: "ACTIVE",
+        vmNo: cleanVmNo,
+      },
+    });
+
+    // 4. Role-specific profile creation
     if (validRole === "STUDENT") {
       const year = body.year ? String(body.year).trim() : null;
       const sec = body.section ? String(body.section).trim() : null;
-      const roll = body.rollNumber ? String(body.rollNumber).trim() : null;
-      const semester = body.semester ? Number.parseInt(String(body.semester), 10) : null;
-      const batch = body.batch ? String(body.batch).trim() : null;
+      const roll = body.rollNumber ? String(body.rollNumber).trim() : (cleanVmNo || null);
+      const semester = body.semester ? Number.parseInt(String(body.semester), 10) : 3;
+      const batch = body.batch ? String(body.batch).trim() : "2023-2027";
       
-      await prisma.$executeRaw`
-        INSERT INTO "StudentProfile" ("userEmail", "rollNumber", "department", "semester", "batch", "year", "section", "createdAt")
-        VALUES (
-          ${cleanEmail},
-          ${roll},
-          ${dept},
-          ${Number.isFinite(semester) ? semester : null},
-          ${batch},
-          ${year},
-          ${sec},
-          NOW()
-        )
-      `;
+      await prisma.studentProfile.upsert({
+        where: { userEmail: cleanEmail },
+        update: {
+          rollNumber: roll,
+          department: dept,
+          semester: Number.isFinite(semester) ? semester : null,
+          batch,
+          year,
+          section: sec,
+        },
+        create: {
+          userEmail: cleanEmail,
+          rollNumber: roll,
+          department: dept,
+          semester: Number.isFinite(semester) ? semester : null,
+          batch,
+          year,
+          section: sec,
+        },
+      });
     } else if (validRole === "FACULTY" && cleanVmNo) {
-      const designation = body.designation ? String(body.designation).trim() : null;
-      await prisma.$executeRaw`
-        INSERT INTO "FacultyProfile" ("vmNo", "department", "designation", "subject1", "subject2", "lab1", "additional1", "additional2", "createdAt")
-        VALUES (
-          ${cleanVmNo},
-          ${dept},
-          ${designation},
-          ${body.subject1 ? String(body.subject1).trim() : null},
-          ${body.subject2 ? String(body.subject2).trim() : null},
-          ${body.lab1 ? String(body.lab1).trim() : null},
-          ${body.additional1 ? String(body.additional1).trim() : null},
-          ${body.additional2 ? String(body.additional2).trim() : null},
-          NOW()
-        )
-      `;
+      const designation = body.designation ? String(body.designation).trim() : "Assistant Professor";
+      await prisma.facultyProfile.upsert({
+        where: { vmNo: cleanVmNo },
+        update: {
+          department: dept,
+          designation,
+          subject1: body.subject1 ? String(body.subject1).trim() : null,
+          subject2: body.subject2 ? String(body.subject2).trim() : null,
+          lab1: body.lab1 ? String(body.lab1).trim() : null,
+          additional1: body.additional1 ? String(body.additional1).trim() : null,
+          additional2: body.additional2 ? String(body.additional2).trim() : null,
+        },
+        create: {
+          vmNo: cleanVmNo,
+          department: dept,
+          designation,
+          subject1: body.subject1 ? String(body.subject1).trim() : null,
+          subject2: body.subject2 ? String(body.subject2).trim() : null,
+          lab1: body.lab1 ? String(body.lab1).trim() : null,
+          additional1: body.additional1 ? String(body.additional1).trim() : null,
+          additional2: body.additional2 ? String(body.additional2).trim() : null,
+        },
+      });
     } else if (validRole === "HOD" && cleanVmNo) {
-      const designation = body.designation ? String(body.designation).trim() : null;
-      await prisma.$executeRaw`
-        INSERT INTO "HodProfile" ("vmNo", "department", "designation", "createdAt")
-        VALUES (
-          ${cleanVmNo},
-          ${dept},
-          ${designation},
-          NOW()
-        )
-      `;
+      const designation = body.designation ? String(body.designation).trim() : `Head of Department (${dept || "CSE"})`;
+      await prisma.hodProfile.upsert({
+        where: { vmNo: cleanVmNo },
+        update: {
+          department: dept,
+          designation,
+        },
+        create: {
+          vmNo: cleanVmNo,
+          department: dept,
+          designation,
+        },
+      });
     }
 
     // 4. Sync UserMode for login compatibility
@@ -200,14 +225,14 @@ export async function POST(req: Request) {
           action: "CREATE_USER",
           details: `Created new ${validRole} account for '${cleanEmail}' (${cleanName})`,
           performedBy: "Admin",
-          userId: newId,
+          userId: createdUser.id,
         },
       });
     } catch (e) {
       console.warn("Could not create audit log:", e);
     }
 
-    const newUser = { id: newId, email: cleanEmail, name: cleanName, role: validRole, status: "ACTIVE" };
+    const newUser = { id: createdUser.id, email: cleanEmail, name: cleanName, role: validRole, status: "ACTIVE" };
 
     return NextResponse.json({ success: true, user: newUser });
   } catch (error: any) {

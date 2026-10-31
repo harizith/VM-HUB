@@ -31,7 +31,37 @@ export async function POST(req: Request) {
       if (classIds.length) targets.push({ classId: { in: classIds } });
       if (facultyNames.length) targets.push({ facultyName: { in: facultyNames } });
       if (vmsNumbers.length) targets.push({ vmsNo: { in: vmsNumbers } });
-      if (targets.length) await prisma.timetableEntry.deleteMany({ where: { OR: targets } });
+
+      if (targets.length) {
+        try {
+          const oldEntries = await prisma.timetableEntry.findMany({ where: { OR: targets } });
+          if (oldEntries.length > 0) {
+            const versionId = `pdf-arch-${Date.now()}`;
+            await (prisma as any).timetableHistory.createMany({
+              data: oldEntries.map((e: any) => ({
+                versionId,
+                classId: e.classId,
+                changeReason: `PDF Timetable Import (${file.name || 'PDF'} Replace Mode)`,
+                archivedBy: authorization.email,
+                dayOrder: e.dayOrder,
+                period: e.period,
+                timeRange: e.timeRange,
+                subjectCode: e.subjectCode,
+                subjectName: e.subjectName,
+                facultyName: e.facultyName,
+                roomNo: e.roomNo,
+                vmsNo: e.vmsNo,
+                category: e.category,
+                originalCreated: e.createdAt,
+              })),
+            });
+          }
+        } catch (archErr) {
+          console.warn("Failed to archive PDF timetable to history:", archErr);
+        }
+
+        await prisma.timetableEntry.deleteMany({ where: { OR: targets } });
+      }
     }
 
     const dbEntries = allSlots.map((slot) => ({

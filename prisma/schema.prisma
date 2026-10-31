@@ -155,6 +155,30 @@ model TimetableEntry {
   @@index([vmsNo])
 }
 
+model TimetableHistory {
+  id              String   @id @default(uuid())
+  versionId       String   // Groups entries from the same archive snapshot
+  classId         String?  // e.g., "II-CSE-A"
+  academicYear    String?  // e.g., "2025-2026" or year/sem label
+  semester        Int?     // e.g., 3, 4, 5
+  changeReason    String?  // e.g., "Next Year / Semester Update", "Manual Edit", "Import"
+  archivedBy      String?  // e.g., "admin@vtmt.org"
+  dayOrder        String?
+  period          Int?
+  timeRange       String?
+  subjectCode     String?
+  subjectName     String?
+  facultyName     String?
+  roomNo          String?
+  vmsNo           String?
+  category        String?
+  originalCreated DateTime?
+  archivedAt      DateTime @default(now())
+
+  @@index([classId, versionId])
+  @@index([archivedAt])
+}
+
 model Attendance {
   id          String   @id @default(uuid())
   studentId   String   // VM No or Email

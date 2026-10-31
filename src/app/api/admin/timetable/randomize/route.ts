@@ -191,8 +191,10 @@ export async function POST(request: Request) {
     const teacherBusySlots = new Set<string>();
     for (const ent of otherClassEntries) {
       if (ent.facultyName?.trim() && ent.dayOrder && ent.period) {
-        const cleanName = ent.facultyName.trim().toLowerCase();
-        teacherBusySlots.add(`${cleanName}|${ent.dayOrder}|${ent.period}`);
+        const subNames = ent.facultyName.split(/[,/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+        for (const cleanName of subNames) {
+          teacherBusySlots.add(`${cleanName}|${ent.dayOrder}|${ent.period}`);
+        }
       }
     }
 
@@ -275,14 +277,21 @@ export async function POST(request: Request) {
     // Helper: is faculty available at (day, p) considering other classes
     const isTeacherAvailable = (facultyName: string | null | undefined, day: string, p: number) => {
       if (!facultyName?.trim()) return true;
-      const cleanName = facultyName.trim().toLowerCase();
-      // Check collision with other classes in the university
-      if (teacherBusySlots.has(`${cleanName}|${day}|${p}`)) {
-        return false;
-      }
-      // Check collision within current class timetable at this period
-      if (grid[day][p]?.facultyName?.trim().toLowerCase() === cleanName) {
-        return false;
+      // Split comma-separated faculty (e.g. for labs with 2 staff or electives with 3 staff)
+      const names = facultyName.split(/[,/]+/).map((n) => n.trim().toLowerCase()).filter(Boolean);
+      for (const cleanName of names) {
+        // Check collision with other classes in the institution
+        if (teacherBusySlots.has(`${cleanName}|${day}|${p}`)) {
+          return false;
+        }
+        // Check collision within current class timetable at this period
+        const currentSlotFac = grid[day][p]?.facultyName;
+        if (currentSlotFac) {
+          const currentNames = currentSlotFac.split(/[,/]+/).map((n: string) => n.trim().toLowerCase()).filter(Boolean);
+          if (currentNames.includes(cleanName)) {
+            return false;
+          }
+        }
       }
       return true;
     };
@@ -657,7 +666,34 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Atomic Replace in DB for this class
+    // 5. Archive old schedule to TimetableHistory first
+    if (existingEntries && existingEntries.length > 0) {
+      try {
+        const versionId = `rand-arch-${Date.now()}`;
+        await (prisma as any).timetableHistory.createMany({
+          data: existingEntries.map((e: any) => ({
+            versionId,
+            classId: e.classId || classId,
+            changeReason: `Automated Schedule Generation / Shuffle (${classId})`,
+            archivedBy: authorization.email,
+            dayOrder: e.dayOrder,
+            period: e.period,
+            timeRange: e.timeRange,
+            subjectCode: e.subjectCode,
+            subjectName: e.subjectName,
+            facultyName: e.facultyName,
+            roomNo: e.roomNo,
+            vmsNo: e.vmsNo,
+            category: e.category,
+            originalCreated: e.createdAt,
+          })),
+        });
+      } catch (archErr) {
+        console.warn("Failed to archive timetable to history before randomize:", archErr);
+      }
+    }
+
+    // 6. Atomic Replace in DB for this class
     await prisma.timetableEntry.deleteMany({
       where: { classId: { in: aliases } },
     });
