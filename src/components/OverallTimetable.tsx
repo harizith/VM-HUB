@@ -14,6 +14,7 @@ export interface TimetableEntry {
   facultyName?: string;
   roomNo: string;
   vmsNo?: string | null;
+  category?: string | null;
 }
 
 export interface UserDetailsProps {

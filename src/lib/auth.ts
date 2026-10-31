@@ -61,38 +61,29 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // 2. Fetch UserMode and User in parallel with retry
-          const [modeRes, userRes] = await withRetry(async () => {
+          // 2. Fetch User and UserMode by either email OR vmNo (case-insensitive)
+          const [userRes, modeRes] = await withRetry(async () => {
             return await Promise.all([
-              prisma.userMode.findFirst({
-                where: { emailid: { equals: inputEmail, mode: "insensitive" } },
-              }).catch(() => null),
               prisma.user.findFirst({
-                where: { email: { equals: inputEmail, mode: "insensitive" } },
+                where: {
+                  OR: [
+                    { email: { equals: inputEmail, mode: "insensitive" } },
+                    { vmNo: { equals: inputEmail, mode: "insensitive" } },
+                  ],
+                },
+              }).catch(() => null),
+              prisma.userMode.findFirst({
+                where: {
+                  OR: [
+                    { emailid: { equals: inputEmail, mode: "insensitive" } },
+                    { vmno: { equals: inputEmail, mode: "insensitive" } },
+                  ],
+                },
               }).catch(() => null),
             ]);
           });
 
-          // Check UserMode table first
-          if (modeRes && modeRes.password) {
-            const isPasswordValid = await verifyPassword(inputPassword, modeRes.password);
-            if (isPasswordValid) {
-              const matchedUser = {
-                id: modeRes.vmno,
-                name: modeRes.emailid.split("@")[0],
-                email: modeRes.emailid,
-                role: modeRes.usermode.toUpperCase(),
-              };
-              verifiedUserCache.set(inputEmail, {
-                ...matchedUser,
-                passwordHash: modeRes.password,
-                cachedAt: Date.now(),
-              });
-              return matchedUser;
-            }
-          }
-
-          // Check standard User table
+          // Check standard User table first
           if (userRes && userRes.password) {
             const isValid = await verifyPassword(inputPassword, userRes.password);
             if (isValid) {
@@ -105,6 +96,25 @@ export const authOptions: NextAuthOptions = {
               verifiedUserCache.set(inputEmail, {
                 ...matchedUser,
                 passwordHash: userRes.password,
+                cachedAt: Date.now(),
+              });
+              return matchedUser;
+            }
+          }
+
+          // Check UserMode table as fallback
+          if (modeRes && modeRes.password) {
+            const isPasswordValid = await verifyPassword(inputPassword, modeRes.password);
+            if (isPasswordValid) {
+              const matchedUser = {
+                id: modeRes.vmno,
+                name: modeRes.emailid.split("@")[0],
+                email: modeRes.emailid,
+                role: modeRes.usermode.toUpperCase(),
+              };
+              verifiedUserCache.set(inputEmail, {
+                ...matchedUser,
+                passwordHash: modeRes.password,
                 cachedAt: Date.now(),
               });
               return matchedUser;
