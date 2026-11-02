@@ -813,16 +813,14 @@ export default function AdminPage() {
               { id: "users", label: "User Accounts", Icon: Users, count: allDisplayUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
-              { id: "teacher-allocations", label: "Teacher Staff Allocation", Icon: UserCheck, count: subjects.length },
-              { id: "timetable", label: "Timetable Schedule", Icon: Calendar, count: 0 },
+              { id: "timetable", label: "Timetable & Staff Allocation", Icon: Calendar, count: subjects.length },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "upload-timetable", label: "Import & Onboarding Deck", Icon: FileText, count: 0 },
               { id: "automation", label: "Automation & Audit Hub", Icon: Zap, count: auditLogs.length },
             ].map((nav) => {
               const isSelected =
-                (nav.id === "teacher-allocations" && (activeTab === "teacher-allocations" || (activeTab === "timetable" && timetableSubTab === "allocations"))) ||
-                (nav.id === "timetable" && (activeTab === "timetable" && timetableSubTab === "schedule")) ||
-                (activeTab === nav.id && nav.id !== "teacher-allocations" && nav.id !== "timetable") ||
+                (nav.id === "timetable" && (activeTab === "timetable" || activeTab === "teacher-allocations")) ||
+                (activeTab === nav.id && nav.id !== "timetable") ||
                 (nav.id === "upload-timetable" && activeTab === "upload-users") ||
                 (nav.id === "automation" && activeTab === "audit");
 
@@ -830,11 +828,7 @@ export default function AdminPage() {
                 <button
                   key={nav.id}
                   onClick={() => {
-                    if (nav.id === "teacher-allocations") {
-                      setTimetableSubTab("allocations");
-                      setActiveTab("teacher-allocations");
-                    } else if (nav.id === "timetable") {
-                      setTimetableSubTab("schedule");
+                    if (nav.id === "timetable") {
                       setActiveTab("timetable");
                     } else {
                       setActiveTab(nav.id as any);
