@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Department setup
-    const dept = body.department ? String(body.department).toUpperCase().trim() : null;
+    const dept = body.department ? String(body.department).toUpperCase().trim() : (validRole === "ADMIN" ? null : "CSE");
     if (dept) {
       try {
         await prisma.department.upsert({
