@@ -813,7 +813,8 @@ export default function AdminPage() {
               { id: "users", label: "User Accounts", Icon: Users, count: allDisplayUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
-              { id: "timetable", label: "Timetables & Allocations", Icon: Calendar, count: 0 },
+              { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
+              { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "upload-timetable", label: "Import & Onboarding Deck", Icon: FileText, count: 0 },
               { id: "automation", label: "Automation & Audit Hub", Icon: Zap, count: auditLogs.length },
@@ -827,6 +828,11 @@ export default function AdminPage() {
                 <button
                   key={nav.id}
                   onClick={() => {
+                    if (nav.id === "teacher-allocations") {
+                      setTimetableSubTab("allocations");
+                    } else if (nav.id === "timetable") {
+                      setTimetableSubTab("schedule");
+                    }
                     setActiveTab(nav.id as any);
                     setSelectedUser(null);
                   }}
@@ -1630,6 +1636,25 @@ export default function AdminPage() {
                         }}
                       >
                         🏫 By Class
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTimetableSubTab("allocations");
+                        }}
+                        style={{
+                          padding: "0.4rem 0.85rem",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          fontWeight: "600",
+                          border: "none",
+                          cursor: "pointer",
+                          backgroundColor: "transparent",
+                          color: "var(--sky-blue)",
+                          transition: "all 0.2s"
+                        }}
+                        title="Open Teacher Staff Allocation Deck for this class"
+                      >
+                        ⚡ Staff Allocations →
                       </button>
                     </div>
 
