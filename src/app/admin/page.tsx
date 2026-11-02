@@ -136,6 +136,7 @@ export default function AdminPage() {
 
   // Timetable State
   const [timetableMode, setTimetableMode] = useState<"faculty" | "class">("faculty");
+  const [timetableSubTab, setTimetableSubTab] = useState<"schedule" | "allocations">("schedule");
   const [timetableUploadTab, setTimetableUploadTab] = useState<"excel" | "pdf-doc">("excel");
   const [importSubTab, setImportSubTab] = useState<"timetable" | "users">("timetable");
   const [timetableCalendarView, setTimetableCalendarView] = useState(false);
@@ -812,9 +813,8 @@ export default function AdminPage() {
               { id: "users", label: "User Accounts", Icon: Users, count: allDisplayUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
-              { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
+              { id: "timetable", label: "Timetables & Allocations", Icon: Calendar, count: 0 },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
-              { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
               { id: "upload-timetable", label: "Import & Onboarding Deck", Icon: FileText, count: 0 },
               { id: "automation", label: "Automation & Audit Hub", Icon: Zap, count: auditLogs.length },
             ].map((nav) => {
@@ -952,9 +952,12 @@ export default function AdminPage() {
                     {activeTab === "users" && "User Directory & Role Subdivisions"}
                     {activeTab === "depts" && "Academic Departments"}
                     {activeTab === "subjects" && "Course & Subject Catalog"}
-                    {activeTab === "teacher-allocations" && "Subject-Handling Teacher Allocations & Randomize Deck"}
+                    {(activeTab === "timetable" || activeTab === "teacher-allocations") && (
+                      timetableSubTab === "allocations"
+                        ? "Subject-Handling Teacher Staff Allocations & Class Setup"
+                        : "Class Timetable & Schedule Management"
+                    )}
                     {activeTab === "notices" && "System Announcements & Broadcasts"}
-                    {activeTab === "timetable" && "Class Timetable Management"}
                     {(activeTab === "upload-timetable" || activeTab === "upload-users") && "Bulk Onboarding, Timetable Import & Official Templates"}
                     {(activeTab === "automation" || activeTab === "audit") && "Autonomous Operations, Diagnostics & Audit Trail"}
                   </h1>
@@ -1206,30 +1209,7 @@ export default function AdminPage() {
                 onCourseUpdated={fetchData}
                 onNavigateToAllocation={(course) => {
                   setTargetAllocationCourse(course);
-                  setActiveTab("teacher-allocations");
-                }}
-              />
-            )}
-
-            {/* SUBJECT-HANDLING TEACHER ALLOCATION & RANDOMIZE */}
-            {activeTab === "teacher-allocations" && (
-              <TeacherSubjectAllocation
-                departments={depts}
-                initialTargetCourse={targetAllocationCourse}
-                onCourseUpdated={fetchData}
-                onBackToCatalog={() => {
-                  setTargetAllocationCourse(null);
-                  setActiveTab("subjects");
-                }}
-                onTimetableGenerated={(targetClassId) => {
-                  fetchData();
-                  // Switch to timetable tab to view generated timetable
-                  const parts = targetClassId.split("-");
-                  if (parts.length >= 3) {
-                    setSelectedYear(parts[0]);
-                    setSelectedDept(parts[1]);
-                    setSelectedSection(parts[2]);
-                  }
+                  setTimetableSubTab("allocations");
                   setActiveTab("timetable");
                 }}
               />
@@ -1439,9 +1419,96 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* TIMETABLE */}
-            {activeTab === "timetable" && (
-              <div>
+            {/* TIMETABLE & STAFF ALLOCATIONS MERGED TAB */}
+            {(activeTab === "timetable" || activeTab === "teacher-allocations") && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Merged Navigation Sub-Tabs */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "1rem",
+                  padding: "0.5rem 0.75rem",
+                  backgroundColor: "var(--bg-card)",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border-subtle)"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button
+                      onClick={() => setTimetableSubTab("schedule")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.45rem",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        backgroundColor: timetableSubTab === "schedule" ? "var(--royal-blue)" : "transparent",
+                        color: timetableSubTab === "schedule" ? "#ffffff" : "var(--text-muted)",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <Calendar size={16} /> 1. Class Schedule & Grid
+                    </button>
+
+                    <button
+                      onClick={() => setTimetableSubTab("allocations")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.45rem",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        backgroundColor: timetableSubTab === "allocations" ? "var(--royal-blue)" : "transparent",
+                        color: timetableSubTab === "allocations" ? "#ffffff" : "var(--text-muted)",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <UserCheck size={16} /> 2. Teacher Staff Allocation
+                    </button>
+                  </div>
+
+                  <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    {timetableSubTab === "schedule"
+                      ? "Viewing live class & faculty schedules"
+                      : "Assigning courses & teaching staff per class section"}
+                  </span>
+                </div>
+
+                {/* SubTab 2: Teacher Staff Allocation Deck */}
+                {timetableSubTab === "allocations" && (
+                  <TeacherSubjectAllocation
+                    departments={depts}
+                    initialTargetCourse={targetAllocationCourse}
+                    onCourseUpdated={fetchData}
+                    onBackToCatalog={() => {
+                      setTargetAllocationCourse(null);
+                      setActiveTab("subjects");
+                    }}
+                    onTimetableGenerated={(targetClassId) => {
+                      fetchData();
+                      const parts = targetClassId.split("-");
+                      if (parts.length >= 3) {
+                        setSelectedYear(parts[0]);
+                        setSelectedDept(parts[1]);
+                        setSelectedSection(parts[2]);
+                      }
+                      setTimetableSubTab("schedule");
+                    }}
+                  />
+                )}
+
+                {/* SubTab 1: Schedule View */}
+                {timetableSubTab === "schedule" && (
+                  <div>
                 {/* Day Order Override Section */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", backgroundColor: "var(--bg-card)", padding: "1.5rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                   <div>
@@ -1935,6 +2002,8 @@ export default function AdminPage() {
                 ) : (
                   <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                     No timetable found for this class. Select criteria and click Fetch.
+                  </div>
+                )}
                   </div>
                 )}
               </div>
