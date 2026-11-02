@@ -148,25 +148,6 @@ export async function POST(req: Request) {
         }
       }
 
-      // If classId is provided, also update any existing active timetable slots for this subject in this class
-      if (classAliases.length > 0) {
-        try {
-          await prisma.timetableEntry.updateMany({
-            where: {
-              classId: { in: classAliases },
-              subjectCode: cleanCode,
-            },
-            data: {
-              facultyName: rawFacultyName,
-              vmsNo: vmsNo || null,
-              ...(roomNo ? { roomNo } : {}),
-            },
-          });
-        } catch (updateErr) {
-          console.warn("Could not sync active timetable entry during allocation:", updateErr);
-        }
-      }
-
       // Ensure subject exists in database
       const existingSub = await prisma.subject.findUnique({
         where: { code: cleanCode },
@@ -182,6 +163,42 @@ export async function POST(req: Request) {
             departmentCode: departmentCode.toUpperCase(),
           },
         });
+      }
+
+      // If classId is provided, sync or create active timetable slot for this subject in this class
+      if (classId) {
+        try {
+          const updateResult = await prisma.timetableEntry.updateMany({
+            where: {
+              classId: { in: classAliases.length > 0 ? classAliases : [classId] },
+              subjectCode: cleanCode,
+            },
+            data: {
+              facultyName: rawFacultyName,
+              vmsNo: vmsNo || null,
+              ...(roomNo ? { roomNo } : {}),
+            },
+          });
+
+          // If no existing slot was updated (e.g. before full timetable generation),
+          // create a baseline entry so this class's allocated teacher persists and immediately displays!
+          if (updateResult.count === 0) {
+            await prisma.timetableEntry.create({
+              data: {
+                classId,
+                subjectCode: cleanCode,
+                subjectName: existingSub?.name || cleanCode,
+                facultyName: rawFacultyName,
+                vmsNo: vmsNo || null,
+                roomNo: roomNo || null,
+                period: 1,
+                dayOrder: "I",
+              },
+            });
+          }
+        } catch (updateErr) {
+          console.warn("Could not sync active timetable entry during allocation:", updateErr);
+        }
       }
 
       results.push({ subjectCode: cleanCode, facultyName: rawFacultyName, classId: classId || "ALL", success: true });
