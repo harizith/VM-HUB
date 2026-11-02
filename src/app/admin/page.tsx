@@ -813,14 +813,16 @@ export default function AdminPage() {
               { id: "users", label: "User Accounts", Icon: Users, count: allDisplayUsers.length },
               { id: "depts", label: "Departments", Icon: Building2, count: depts.length },
               { id: "subjects", label: "Course Catalog", Icon: BookOpen, count: subjects.length },
-              { id: "teacher-allocations", label: "Subject-Teacher Allocations", Icon: UserCheck, count: subjects.length },
-              { id: "timetable", label: "Timetables", Icon: Calendar, count: 0 },
+              { id: "teacher-allocations", label: "Teacher Staff Allocation", Icon: UserCheck, count: subjects.length },
+              { id: "timetable", label: "Timetable Schedule", Icon: Calendar, count: 0 },
               { id: "notices", label: "Announcements", Icon: Megaphone, count: notices.length },
               { id: "upload-timetable", label: "Import & Onboarding Deck", Icon: FileText, count: 0 },
               { id: "automation", label: "Automation & Audit Hub", Icon: Zap, count: auditLogs.length },
             ].map((nav) => {
               const isSelected =
-                activeTab === nav.id ||
+                (nav.id === "teacher-allocations" && (activeTab === "teacher-allocations" || (activeTab === "timetable" && timetableSubTab === "allocations"))) ||
+                (nav.id === "timetable" && (activeTab === "timetable" && timetableSubTab === "schedule")) ||
+                (activeTab === nav.id && nav.id !== "teacher-allocations" && nav.id !== "timetable") ||
                 (nav.id === "upload-timetable" && activeTab === "upload-users") ||
                 (nav.id === "automation" && activeTab === "audit");
 
@@ -830,10 +832,13 @@ export default function AdminPage() {
                   onClick={() => {
                     if (nav.id === "teacher-allocations") {
                       setTimetableSubTab("allocations");
+                      setActiveTab("teacher-allocations");
                     } else if (nav.id === "timetable") {
                       setTimetableSubTab("schedule");
+                      setActiveTab("timetable");
+                    } else {
+                      setActiveTab(nav.id as any);
                     }
-                    setActiveTab(nav.id as any);
                     setSelectedUser(null);
                   }}
                   style={{
@@ -1435,57 +1440,66 @@ export default function AdminPage() {
                   justifyContent: "space-between",
                   flexWrap: "wrap",
                   gap: "1rem",
-                  padding: "0.5rem 0.75rem",
+                  padding: "0.75rem 1rem",
                   backgroundColor: "var(--bg-card)",
-                  borderRadius: "12px",
-                  border: "1px solid var(--border-subtle)"
+                  borderRadius: "14px",
+                  border: "1.5px solid var(--border-subtle)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                     <button
-                      onClick={() => setTimetableSubTab("schedule")}
+                      onClick={() => {
+                        setTimetableSubTab("allocations");
+                        setActiveTab("teacher-allocations");
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "0.45rem",
-                        padding: "0.5rem 1rem",
-                        borderRadius: "8px",
-                        border: "none",
+                        gap: "0.55rem",
+                        padding: "0.65rem 1.25rem",
+                        borderRadius: "10px",
+                        border: timetableSubTab === "allocations" ? "1px solid var(--royal-blue)" : "1px solid var(--border-subtle)",
                         cursor: "pointer",
-                        fontSize: "0.85rem",
+                        fontSize: "0.9rem",
                         fontWeight: "700",
-                        backgroundColor: timetableSubTab === "schedule" ? "var(--royal-blue)" : "transparent",
-                        color: timetableSubTab === "schedule" ? "#ffffff" : "var(--text-muted)",
-                        transition: "all 0.15s ease",
+                        backgroundColor: timetableSubTab === "allocations" ? "var(--royal-blue)" : "var(--bg-input)",
+                        color: timetableSubTab === "allocations" ? "#ffffff" : "var(--text-main)",
+                        boxShadow: timetableSubTab === "allocations" ? "0 4px 12px rgba(10, 102, 194, 0.28)" : "none",
+                        transition: "all 0.18s ease",
                       }}
                     >
-                      <Calendar size={16} /> 1. Class Schedule & Grid
+                      <UserCheck size={18} /> 👥 Teacher-Subject Allocation
                     </button>
 
                     <button
-                      onClick={() => setTimetableSubTab("allocations")}
+                      onClick={() => {
+                        setTimetableSubTab("schedule");
+                        setActiveTab("timetable");
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "0.45rem",
-                        padding: "0.5rem 1rem",
-                        borderRadius: "8px",
-                        border: "none",
+                        gap: "0.55rem",
+                        padding: "0.65rem 1.25rem",
+                        borderRadius: "10px",
+                        border: timetableSubTab === "schedule" ? "1px solid var(--royal-blue)" : "1px solid var(--border-subtle)",
                         cursor: "pointer",
-                        fontSize: "0.85rem",
+                        fontSize: "0.9rem",
                         fontWeight: "700",
-                        backgroundColor: timetableSubTab === "allocations" ? "var(--royal-blue)" : "transparent",
-                        color: timetableSubTab === "allocations" ? "#ffffff" : "var(--text-muted)",
-                        transition: "all 0.15s ease",
+                        backgroundColor: timetableSubTab === "schedule" ? "var(--royal-blue)" : "var(--bg-input)",
+                        color: timetableSubTab === "schedule" ? "#ffffff" : "var(--text-main)",
+                        boxShadow: timetableSubTab === "schedule" ? "0 4px 12px rgba(10, 102, 194, 0.28)" : "none",
+                        transition: "all 0.18s ease",
                       }}
                     >
-                      <UserCheck size={16} /> 2. Teacher Staff Allocation
+                      <Calendar size={18} /> 📅 Timetable Schedule & Grid
                     </button>
                   </div>
 
-                  <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: "500" }}>
                     {timetableSubTab === "schedule"
-                      ? "Viewing live class & faculty schedules"
-                      : "Assigning courses & teaching staff per class section"}
+                      ? "Viewing live weekly timetable grid by Class or Faculty"
+                      : "Assigning courses, teachers, labs & room numbers per class section"}
                   </span>
                 </div>
 
@@ -2025,8 +2039,50 @@ export default function AdminPage() {
                     </table>
                   </div>
                 ) : (
-                  <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", backgroundColor: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
-                    No timetable found for this class. Select criteria and click Fetch.
+                  <div style={{
+                    padding: "3.5rem 2rem",
+                    textAlign: "center",
+                    backgroundColor: "var(--bg-card)",
+                    borderRadius: "14px",
+                    border: "1.5px dashed var(--border-subtle)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "1rem"
+                  }}>
+                    <div style={{
+                      width: "56px",
+                      height: "56px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(10, 102, 194, 0.12)",
+                      color: "var(--royal-blue)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}>
+                      <Calendar size={28} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: "0 0 0.35rem 0", fontSize: "1.05rem", fontWeight: "700" }}>
+                        No Schedule Loaded for Selected View
+                      </h4>
+                      <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem", maxWidth: "480px" }}>
+                        Select your Department, Year & Section and click <strong>Fetch Timetable</strong>, or configure teacher allocations to generate a fresh weekly timetable.
+                      </p>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+                      <button
+                        onClick={() => {
+                          setTimetableSubTab("allocations");
+                          setActiveTab("teacher-allocations");
+                        }}
+                        className="btn-royal"
+                        style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1.25rem" }}
+                      >
+                        <UserCheck size={16} /> Open Teacher-Subject Allocation
+                      </button>
+                    </div>
                   </div>
                 )}
                   </div>
