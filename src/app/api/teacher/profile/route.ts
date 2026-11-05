@@ -45,19 +45,21 @@ export async function GET(request: Request) {
     const teacherName = user.name || "";
 
     // Query all timetable entries assigned to this teacher to get the classes taking each subject
+    // Note: Teacher can be Staff 1 or Staff 2 (e.g. "Staff 1, Staff 2" for labs/electives)
     let timetableEntries: any[] = [];
     try {
       timetableEntries = await prisma.timetableEntry.findMany({
         where: {
           OR: [
-            ...(vmNo ? [{ vmsNo: vmNo }] : []),
-            ...(teacherName ? [{ facultyName: { equals: teacherName, mode: "insensitive" as const } }] : []),
+            ...(vmNo ? [{ vmsNo: { contains: vmNo, mode: "insensitive" as const } }] : []),
+            ...(teacherName ? [{ facultyName: { contains: teacherName, mode: "insensitive" as const } }] : []),
           ],
         },
         select: {
           subjectName: true,
           subjectCode: true,
           classId: true,
+          facultyName: true,
         },
       });
     } catch (ttErr) {
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
     const s1 = user.facultyProfile?.subject1 || "";
     const s2 = user.facultyProfile?.subject2 || "";
     const l1 = user.facultyProfile?.lab1 || "";
+    const l2 = user.facultyProfile?.lab2 || "";
     const a1 = user.facultyProfile?.additional1 || "";
     const a2 = user.facultyProfile?.additional2 || "";
 
@@ -105,6 +108,7 @@ export async function GET(request: Request) {
             subject1: s1,
             subject2: s2,
             lab1: l1,
+            lab2: l2,
             additional1: a1,
             additional2: a2,
           },
@@ -112,6 +116,7 @@ export async function GET(request: Request) {
             subject1: getClassesForSubject(s1),
             subject2: getClassesForSubject(s2),
             lab1: getClassesForSubject(l1),
+            lab2: getClassesForSubject(l2),
             additional1: getClassesForSubject(a1),
             additional2: getClassesForSubject(a2),
           },

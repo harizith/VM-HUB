@@ -105,8 +105,16 @@ export async function POST(req: Request) {
             let updateData: any = {};
             if (profile) {
               if (isLab) {
-                // If it is a lab subject, ensure lab1 is updated with this exact lab code
-                if (profile.lab1?.toUpperCase().trim() !== cleanCode) {
+                // If it is a lab subject, assign to lab1 or lab2 if lab1 already taken
+                const existingLab1 = (profile.lab1 || "").toUpperCase().trim();
+                const existingLab2 = (profile.lab2 || "").toUpperCase().trim();
+
+                if (!existingLab1 || existingLab1 === cleanCode) {
+                  updateData.lab1 = cleanCode;
+                } else if (!existingLab2 || existingLab2 === cleanCode) {
+                  updateData.lab2 = cleanCode;
+                } else {
+                  // Fallback update lab1
                   updateData.lab1 = cleanCode;
                 }
               } else {

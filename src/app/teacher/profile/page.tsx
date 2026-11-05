@@ -264,6 +264,7 @@ export default function TeacherProfilePage() {
                   { key: "subject1", label: "Subject 1", value: data.profile.subjects?.subject1 },
                   { key: "subject2", label: "Subject 2", value: data.profile.subjects?.subject2 },
                   { key: "lab1", label: "Lab 1", value: data.profile.subjects?.lab1 },
+                  { key: "lab2", label: "Lab 2", value: data.profile.subjects?.lab2 },
                   { key: "additional1", label: "Additional 1", value: data.profile.subjects?.additional1 },
                   { key: "additional2", label: "Additional 2", value: data.profile.subjects?.additional2 },
                 ].map(({ key, label, value }) => {

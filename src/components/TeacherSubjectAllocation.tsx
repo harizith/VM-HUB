@@ -34,6 +34,7 @@ interface TeacherItem {
   subject1?: string | null;
   subject2?: string | null;
   lab1?: string | null;
+  lab2?: string | null;
   additional1?: string | null;
   additional2?: string | null;
 }
@@ -190,6 +191,7 @@ export default function TeacherSubjectAllocation({
             subject1: u.facultyProfile?.subject1 || null,
             subject2: u.facultyProfile?.subject2 || null,
             lab1: u.facultyProfile?.lab1 || null,
+            lab2: u.facultyProfile?.lab2 || null,
             additional1: u.facultyProfile?.additional1 || null,
             additional2: u.facultyProfile?.additional2 || null,
           }));
@@ -217,30 +219,60 @@ export default function TeacherSubjectAllocation({
     setAssignments((prev) => {
       const classMap: Record<string, { facultyName: string; vmsNo: string; roomNo: string }> = {};
 
+      // Helper: get aliases for classId comparison
+      const targetAliases = [
+        targetClassId.toUpperCase(),
+        targetClassId.toUpperCase().replace(/^([IV]+)-/, (m, y) => {
+          if (y === "I") return "1-";
+          if (y === "II") return "2-";
+          if (y === "III") return "3-";
+          if (y === "IV") return "4-";
+          return m;
+        }),
+        targetClassId.toUpperCase().replace(/^([1-4])-/, (m, y) => {
+          if (y === "1") return "I-";
+          if (y === "2") return "II-";
+          if (y === "3") return "III-";
+          if (y === "4") return "IV-";
+          return m;
+        }),
+      ];
+
       subs.forEach((sub: any) => {
         // Priority 1: Check if there is an existing schedule slot specifically for this class
         let classSlotFaculty = "";
         let classSlotRoom = "";
+        let classSlotVm = "";
 
         if (sub.scheduleSlots && Array.isArray(sub.scheduleSlots)) {
           const matchingSlot = sub.scheduleSlots.find(
-            (slot: any) => slot.classId && slot.classId.toUpperCase() === targetClassId.toUpperCase()
+            (slot: any) => slot.classId && targetAliases.includes(slot.classId.toUpperCase())
           );
           if (matchingSlot && matchingSlot.facultyName) {
             classSlotFaculty = matchingSlot.facultyName;
             classSlotRoom = matchingSlot.roomNo || "";
+            classSlotVm = matchingSlot.vmsNo || "";
           }
         }
 
         // If this class has its own assigned teacher in the timetable, use it!
         if (classSlotFaculty) {
-          const matchedTeacher = (allUsers || []).find((u: any) => {
-            const rawFac = classSlotFaculty.split(/[,/]+/)[0].trim().toLowerCase();
-            return (u.name || "").toLowerCase() === rawFac;
+          const staffNames = classSlotFaculty.split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+          const vmsList = staffNames.map((name: string) => {
+            const matched = (allUsers || []).find((u: any) => {
+              const uName = (u.name || "").toLowerCase().trim();
+              const fName = name.toLowerCase().trim();
+              return (
+                uName === fName ||
+                uName.replace(/^(dr|mr|ms|mrs)\.?\s*/i, "") === fName.replace(/^(dr|mr|ms|mrs)\.?\s*/i, "")
+              );
+            });
+            return matched?.vmNo || matched?.facultyProfile?.vmNo || "";
           });
+
           classMap[sub.code] = {
             facultyName: classSlotFaculty,
-            vmsNo: matchedTeacher?.vmNo || matchedTeacher?.facultyProfile?.vmNo || "",
+            vmsNo: classSlotVm || vmsList.join(", "),
             roomNo: classSlotRoom || (sub.code.toLowerCase().includes("lab") ? "CS-LAB-1" : "LH-201"),
           };
         } else if (prev[sub.code]) {
@@ -420,7 +452,7 @@ export default function TeacherSubjectAllocation({
         const subCodeLower = sub.code.toLowerCase();
 
         const profileMatchedTeacher = teachers.find((t) => {
-          const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
+          const profileSubjects = [t.subject1, t.subject2, t.lab1, t.lab2, t.additional1, t.additional2]
             .filter(Boolean)
             .map((s) => String(s).toLowerCase().trim());
 
@@ -1528,7 +1560,7 @@ export default function TeacherSubjectAllocation({
                                       : "-- Choose Handling Professor (1 for this class) --"}
                                   </option>
                                   {teachers.map((t) => {
-                                    const profileSubjects = [t.subject1, t.subject2, t.lab1, t.additional1, t.additional2]
+                                    const profileSubjects = [t.subject1, t.subject2, t.lab1, t.lab2, t.additional1, t.additional2]
                                       .filter(Boolean)
                                       .map(s => String(s).trim());
 

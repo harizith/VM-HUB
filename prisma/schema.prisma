@@ -62,6 +62,7 @@ model FacultyProfile {
   subject1    String?
   subject2    String?
   lab1        String?
+  lab2        String?
   additional1 String?
   additional2 String?
   createdAt   DateTime   @default(now())

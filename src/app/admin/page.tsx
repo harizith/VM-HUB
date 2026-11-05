@@ -38,6 +38,7 @@ interface UserItem {
     subject1?: string | null;
     subject2?: string | null;
     lab1?: string | null;
+    lab2?: string | null;
     additional1?: string | null;
     additional2?: string | null;
   } | null;
@@ -2625,6 +2626,7 @@ export default function AdminPage() {
                         { tag: "Sub 1", val: fp.subject1, color: "var(--royal-blue)", bg: "rgba(59, 130, 246, 0.15)" },
                         { tag: "Sub 2", val: fp.subject2, color: "var(--royal-blue)", bg: "rgba(59, 130, 246, 0.15)" },
                         { tag: "Lab 1", val: fp.lab1, color: "#d97706", bg: "rgba(245, 158, 11, 0.15)" },
+                        { tag: "Lab 2", val: fp.lab2, color: "#d97706", bg: "rgba(245, 158, 11, 0.15)" },
                       ].filter((s) => Boolean(s.val));
 
                       const additionalSubjects = [

@@ -815,13 +815,26 @@ export async function POST(request: Request) {
               .map((s) => String(s).toUpperCase().trim());
 
             if (isLabEntry) {
-              // Always ensure lab1 reflects this exact lab course
-              if (matchedFp.lab1?.toUpperCase().trim() !== cleanCode) {
-                await prisma.facultyProfile.update({
-                  where: { vmNo: matchedFp.vmNo },
-                  data: { lab1: cleanCode },
-                });
-                matchedFp.lab1 = cleanCode;
+              // Ensure lab1 or lab2 reflects this exact lab course
+              const curLab1 = (matchedFp.lab1 || '').toUpperCase().trim();
+              const curLab2 = (matchedFp.lab2 || '').toUpperCase().trim();
+
+              if (!curLab1 || curLab1 === cleanCode) {
+                if (curLab1 !== cleanCode) {
+                  await prisma.facultyProfile.update({
+                    where: { vmNo: matchedFp.vmNo },
+                    data: { lab1: cleanCode },
+                  });
+                  matchedFp.lab1 = cleanCode;
+                }
+              } else if (!curLab2 || curLab2 === cleanCode) {
+                if (curLab2 !== cleanCode) {
+                  await prisma.facultyProfile.update({
+                    where: { vmNo: matchedFp.vmNo },
+                    data: { lab2: cleanCode },
+                  });
+                  matchedFp.lab2 = cleanCode;
+                }
               }
             } else if (!currentSubs.includes(cleanCode)) {
               let updateField = '';

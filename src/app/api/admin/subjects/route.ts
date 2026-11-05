@@ -33,6 +33,7 @@ export async function GET(req: Request) {
           subjectCode: true,
           classId: true,
           facultyName: true,
+          vmsNo: true,
           roomNo: true,
           dayOrder: true,
           period: true,
@@ -62,6 +63,7 @@ export async function GET(req: Request) {
               subject1: true,
               subject2: true,
               lab1: true,
+              lab2: true,
               additional1: true,
               additional2: true
             }
@@ -87,7 +89,7 @@ export async function GET(req: Request) {
       for (const u of facultyUsers) {
         const fp = u.facultyProfile;
         if (!fp) continue;
-        const profileSubjects = [fp.subject1, fp.subject2, fp.lab1, fp.additional1, fp.additional2]
+        const profileSubjects = [fp.subject1, fp.subject2, fp.lab1, fp.lab2, fp.additional1, fp.additional2]
           .filter(Boolean)
           .map((s: string) => s.trim().toLowerCase());
 
@@ -108,11 +110,12 @@ export async function GET(req: Request) {
       const rooms = Array.from(new Set(related.map((t: { roomNo: string }) => t.roomNo).filter(Boolean)));
       const weeklyHours = related.length;
       
-      const scheduleSlots = related.map((r: { dayOrder: string; period: number; timeRange: string; classId: string; roomNo: string; facultyName: string }) => ({
+      const scheduleSlots = related.map((r: { dayOrder: string; period: number; timeRange: string; classId: string; roomNo: string; facultyName: string; vmsNo?: string | null }) => ({
         dayOrder: r.dayOrder,
         period: r.period,
         classId: r.classId,
         facultyName: r.facultyName,
+        vmsNo: r.vmsNo || null,
         roomNo: r.roomNo,
         timeRange: r.timeRange
       }));
