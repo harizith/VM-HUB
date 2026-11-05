@@ -174,6 +174,13 @@ export default function AdminPage() {
   const [historySemester, setHistorySemester] = useState<number>(3);
   const [historyChangeReason, setHistoryChangeReason] = useState("Next Year / Semester Transition");
 
+  // History Modal Custom Filters (Academic Year, Odd/Even Sem, Dept, Year 1-4, Section)
+  const [historyFilterAcadYear, setHistoryFilterAcadYear] = useState("ALL");
+  const [historyFilterSemType, setHistoryFilterSemType] = useState<"ALL" | "ODD" | "EVEN">("ALL");
+  const [historyFilterDept, setHistoryFilterDept] = useState("ALL");
+  const [historyFilterYear, setHistoryFilterYear] = useState("ALL");
+  const [historyFilterSection, setHistoryFilterSection] = useState("ALL");
+
   // User Timetable Modal State
   const [userTimetableModalUser, setUserTimetableModalUser] = useState<UserItem | null>(null);
   const [userTimetableMap, setUserTimetableMap] = useState<Record<string, TimetableEntry[]> | null>(null);
@@ -227,6 +234,61 @@ export default function AdminPage() {
       map[d].sort((a, b) => a.period - b.period);
     });
     return map;
+  };
+
+  const fetchTimetableHistory = async (overrideParams?: {
+    acadYear?: string;
+    semType?: string;
+    dept?: string;
+    year?: string;
+    sec?: string;
+  }) => {
+    setLoadingHistory(true);
+    try {
+      const aYear = overrideParams?.acadYear ?? historyFilterAcadYear;
+      const sType = overrideParams?.semType ?? historyFilterSemType;
+      const d = overrideParams?.dept ?? historyFilterDept;
+      const y = overrideParams?.year ?? historyFilterYear;
+      const s = overrideParams?.sec ?? historyFilterSection;
+
+      let targetClassId = "";
+      if (y !== "ALL" && d !== "ALL" && s !== "ALL") {
+        targetClassId = `${y}-${d}-${s}`;
+      } else if (y !== "ALL" || d !== "ALL" || s !== "ALL") {
+        const parts = [
+          y !== "ALL" ? y : selectedYear,
+          d !== "ALL" ? d : selectedDept,
+          s !== "ALL" ? s : selectedSection,
+        ];
+        targetClassId = parts.join("-");
+      } else {
+        targetClassId = `${selectedYear}-${selectedDept}-${selectedSection}`;
+      }
+
+      const queryParams = new URLSearchParams({
+        history: "true",
+      });
+
+      if (targetClassId) queryParams.set("classId", targetClassId);
+      if (aYear && aYear !== "ALL") queryParams.set("academicYear", aYear);
+      if (sType && sType !== "ALL") queryParams.set("semesterType", sType);
+
+      const res = await fetch(`/api/admin/timetable?${queryParams.toString()}`).then((r) => r.json());
+      if (res.success) {
+        setTimetableHistoryVersions(res.versions || []);
+        if (res.versions && res.versions.length > 0) {
+          setSelectedHistoryVersion(res.versions[0]);
+        } else {
+          setSelectedHistoryVersion(null);
+        }
+      } else {
+        alert("Failed to load history: " + res.error);
+      }
+    } catch (e: any) {
+      alert("Error loading history: " + e.message);
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   const openUserTimetable = async (u: UserItem) => {
@@ -1676,27 +1738,20 @@ export default function AdminPage() {
 
                     {timetableMode === "class" && (
                       <button 
-                        onClick={async () => {
-                          setLoadingHistory(true);
+                        onClick={() => {
+                          setHistoryFilterAcadYear("ALL");
+                          setHistoryFilterSemType("ALL");
+                          setHistoryFilterDept(selectedDept);
+                          setHistoryFilterYear(selectedYear);
+                          setHistoryFilterSection(selectedSection);
                           setShowHistoryModal(true);
-                          const classId = `${selectedYear}-${selectedDept}-${selectedSection}`;
-                          try {
-                            const res = await fetch(`/api/admin/timetable?classId=${encodeURIComponent(classId)}&history=true`).then(r => r.json());
-                            if (res.success) {
-                              setTimetableHistoryVersions(res.versions || []);
-                              if (res.versions && res.versions.length > 0) {
-                                setSelectedHistoryVersion(res.versions[0]);
-                              } else {
-                                setSelectedHistoryVersion(null);
-                              }
-                            } else {
-                              alert("Failed to load history: " + res.error);
-                            }
-                          } catch (e: any) {
-                            alert("Error loading history: " + e.message);
-                          } finally {
-                            setLoadingHistory(false);
-                          }
+                          fetchTimetableHistory({
+                            acadYear: "ALL",
+                            semType: "ALL",
+                            dept: selectedDept,
+                            year: selectedYear,
+                            sec: selectedSection,
+                          });
                         }}
                         style={{ 
                           padding: "0.4rem 0.85rem", 
@@ -3369,7 +3424,7 @@ export default function AdminPage() {
                     Timetable History & Archival Log
                   </h3>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "0.2rem 0 0 0" }}>
-                    Class: <strong style={{ color: "var(--sky-blue)" }}>{selectedYear}-{selectedDept}-{selectedSection}</strong> • Preserves old semester & academic year timetables prior to updates
+                    Filter and view archived semester & academic year timetables for any class
                   </p>
                 </div>
               </div>
@@ -3379,6 +3434,135 @@ export default function AdminPage() {
               >
                 <X size={20} />
               </button>
+            </div>
+
+            {/* CRITERIA FILTER BAR: Academic Year, Sem (Odd/Even), Dept, Year (1,2,3,4), Section */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: "0.75rem",
+              padding: "1rem",
+              backgroundColor: "var(--bg-input)",
+              borderRadius: "10px",
+              border: "1px solid var(--border-subtle)",
+              alignItems: "flex-end"
+            }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem" }}>
+                  Academic Year
+                </label>
+                <select
+                  value={historyFilterAcadYear}
+                  onChange={(e) => setHistoryFilterAcadYear(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem" }}
+                >
+                  <option value="ALL">All Academic Years</option>
+                  <option value="2026-2027">2026 - 2027</option>
+                  <option value="2025-2026">2025 - 2026</option>
+                  <option value="2024-2025">2024 - 2025</option>
+                  <option value="2023-2024">2023 - 2024</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem" }}>
+                  Semester (Odd / Even)
+                </label>
+                <select
+                  value={historyFilterSemType}
+                  onChange={(e) => setHistoryFilterSemType(e.target.value as any)}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem" }}
+                >
+                  <option value="ALL">All Semesters</option>
+                  <option value="ODD">Odd Semesters (1, 3, 5, 7)</option>
+                  <option value="EVEN">Even Semesters (2, 4, 6, 8)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem" }}>
+                  Department
+                </label>
+                <select
+                  value={historyFilterDept}
+                  onChange={(e) => setHistoryFilterDept(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem" }}
+                >
+                  <option value="ALL">All Departments</option>
+                  {depts.length > 0 ? (
+                    depts.map((d) => (
+                      <option key={d.code} value={d.code}>{d.code} - {d.name}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="CSE">CSE</option>
+                      <option value="ECE">ECE</option>
+                      <option value="AIDS">AIDS</option>
+                      <option value="MECH">MECH</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem" }}>
+                  Year (1, 2, 3, 4)
+                </label>
+                <select
+                  value={historyFilterYear}
+                  onChange={(e) => setHistoryFilterYear(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem" }}
+                >
+                  <option value="ALL">All Years</option>
+                  <option value="I">Year 1 (I)</option>
+                  <option value="II">Year 2 (II)</option>
+                  <option value="III">Year 3 (III)</option>
+                  <option value="IV">Year 4 (IV)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", marginBottom: "0.3rem" }}>
+                  Section
+                </label>
+                <select
+                  value={historyFilterSection}
+                  onChange={(e) => setHistoryFilterSection(e.target.value)}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem" }}
+                >
+                  <option value="ALL">All Sections</option>
+                  <option value="A">Section A</option>
+                  <option value="B">Section B</option>
+                  <option value="C">Section C</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  onClick={() => fetchTimetableHistory()}
+                  disabled={loadingHistory}
+                  className="btn-royal"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.4rem",
+                    padding: "0.55rem 1rem",
+                    fontSize: "0.85rem",
+                    fontWeight: "700",
+                    flex: 1,
+                    height: "38px"
+                  }}
+                >
+                  {loadingHistory ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                  Find History
+                </button>
+              </div>
             </div>
 
             {loadingHistory ? (

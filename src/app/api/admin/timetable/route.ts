@@ -42,6 +42,9 @@ export async function GET(request: Request) {
     const facultyName = searchParams.get('facultyName');
     const listOptions = searchParams.get('list');
     const viewHistory = searchParams.get('history') === 'true';
+    const academicYear = searchParams.get('academicYear');
+    const semester = searchParams.get('semester');
+    const semesterType = searchParams.get('semesterType'); // 'ODD' or 'EVEN'
 
     // Query historical snapshots for a class or all classes
     if (viewHistory) {
@@ -49,6 +52,19 @@ export async function GET(request: Request) {
       if (classId) {
         historyWhere.classId = { in: getClassAliases(classId) };
       }
+      if (academicYear && academicYear !== 'ALL') {
+        historyWhere.academicYear = { contains: academicYear };
+      }
+      if (semester && semester !== 'ALL') {
+        historyWhere.semester = Number.parseInt(semester, 10);
+      } else if (semesterType && semesterType !== 'ALL') {
+        if (semesterType === 'ODD') {
+          historyWhere.semester = { in: [1, 3, 5, 7] };
+        } else if (semesterType === 'EVEN') {
+          historyWhere.semester = { in: [2, 4, 6, 8] };
+        }
+      }
+
       const historyEntries = await (prisma as any).timetableHistory.findMany({
         where: historyWhere,
         orderBy: [{ archivedAt: 'desc' }, { dayOrder: 'asc' }, { period: 'asc' }],
