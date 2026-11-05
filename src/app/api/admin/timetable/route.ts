@@ -178,15 +178,35 @@ export async function GET(request: Request) {
     let timetable: any[] = [];
 
     if (facultyName) {
+      const cleanFac = facultyName.trim();
+      const facLower = cleanFac.toLowerCase();
       // Query by faculty name or vmsNo
-      timetable = await prisma.timetableEntry.findMany({
+      const rawTimetable = await prisma.timetableEntry.findMany({
         where: {
           OR: [
-            { facultyName: { contains: facultyName.trim(), mode: 'insensitive' } },
-            { vmsNo: { contains: facultyName.trim() } },
+            { facultyName: { contains: cleanFac, mode: 'insensitive' } },
+            { vmsNo: { contains: cleanFac } },
           ],
         },
         orderBy: [{ dayOrder: 'asc' }, { period: 'asc' }],
+      });
+
+      // Filter exact staff token to prevent partial name overlap (e.g. "Ram" matching "Ramesh")
+      timetable = rawTimetable.filter((entry) => {
+        if (entry.vmsNo) {
+          const vms = entry.vmsNo.split(/[,/]+/).map((v: string) => v.trim().toLowerCase());
+          if (vms.includes(facLower)) return true;
+        }
+        if (entry.facultyName) {
+          const staff = entry.facultyName.split(/[,/]+/).map((s: string) => s.trim().toLowerCase());
+          return staff.some((s: string) => {
+            if (s === facLower) return true;
+            const strippedS = s.replace(/^(dr|mr|ms|mrs)\.?\s*/i, '');
+            const strippedTarget = facLower.replace(/^(dr|mr|ms|mrs)\.?\s*/i, '');
+            return strippedS === strippedTarget;
+          });
+        }
+        return false;
       });
 
       return NextResponse.json({ success: true, timetable, mode: 'faculty', facultyName });

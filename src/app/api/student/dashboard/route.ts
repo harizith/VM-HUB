@@ -37,6 +37,40 @@ export async function GET(request: Request) {
     const normalizedDept = department.replace(/^(B\.E\s+|B\.Tech\s+)/i, "").trim();
     const classId = yearStr && normalizedDept && section ? `${yearStr}-${normalizedDept}-${section}` : "";
 
+    // Helper: get aliases for classId (e.g. "II-CSE-A" <-> "2-CSE-A", "IV-CSE-A" <-> "VII-CSE-A")
+    function getClassAliases(cid: string): string[] {
+      if (!cid) return [];
+      const aliases = new Set<string>([cid]);
+      const parts = cid.split('-');
+      if (parts.length >= 3) {
+        const yearOrSem = parts[0].toUpperCase();
+        const dept = parts[1];
+        const sec = parts[2];
+        if (yearOrSem === 'IV' || yearOrSem === 'VII' || yearOrSem === 'VIII' || yearOrSem === '4') {
+          aliases.add(`IV-${dept}-${sec}`);
+          aliases.add(`VII-${dept}-${sec}`);
+          aliases.add(`VIII-${dept}-${sec}`);
+          aliases.add(`4-${dept}-${sec}`);
+        } else if (yearOrSem === 'III' || yearOrSem === 'V' || yearOrSem === 'VI' || yearOrSem === '3') {
+          aliases.add(`III-${dept}-${sec}`);
+          aliases.add(`V-${dept}-${sec}`);
+          aliases.add(`VI-${dept}-${sec}`);
+          aliases.add(`3-${dept}-${sec}`);
+        } else if (yearOrSem === 'II' || yearOrSem === '2') {
+          aliases.add(`II-${dept}-${sec}`);
+          aliases.add(`2-${dept}-${sec}`);
+          aliases.add(`III-${dept}-${sec}`);
+          aliases.add(`IV-${dept}-${sec}`);
+        } else if (yearOrSem === 'I' || yearOrSem === '1') {
+          aliases.add(`I-${dept}-${sec}`);
+          aliases.add(`1-${dept}-${sec}`);
+        }
+      }
+      return Array.from(aliases);
+    }
+
+    const classAliases = getClassAliases(classId);
+
     // 3. Compute Day Order dynamically
     const { currentDayOrder, tomorrowDayOrder } = await getDayOrderInfo();
 
@@ -44,8 +78,8 @@ export async function GET(request: Request) {
     let timetable: any[] = [];
     let fullTimetable: Record<string, any[]> = { "I": [], "II": [], "III": [], "IV": [], "V": [], UNASSIGNED: [] };
     try {
-      const allEntries = classId ? await prisma.timetableEntry.findMany({
-        where: { classId },
+      const allEntries = classAliases.length ? await prisma.timetableEntry.findMany({
+        where: { classId: { in: classAliases } },
         orderBy: [{ dayOrder: "asc" }, { period: "asc" }],
       }) : [];
 

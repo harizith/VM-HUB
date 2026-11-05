@@ -54,9 +54,30 @@ export async function GET(request: Request) {
       }
 
       if (orConditions.length > 0) {
-        fullTimetable = await prisma.timetableEntry.findMany({
+        const rawEntries = await prisma.timetableEntry.findMany({
           where: { OR: orConditions },
           orderBy: [{ dayOrder: "asc" }, { period: "asc" }]
+        });
+
+        const targetNameLower = name.toLowerCase().trim();
+        const targetVmLower = (vmNo || "").toLowerCase().trim();
+
+        // Exact staff token matching so "Ram" does not match "Ramesh"
+        fullTimetable = rawEntries.filter((entry) => {
+          if (targetVmLower && entry.vmsNo) {
+            const vms = entry.vmsNo.split(/[,/]+/).map((v: string) => v.trim().toLowerCase());
+            if (vms.includes(targetVmLower)) return true;
+          }
+          if (targetNameLower && entry.facultyName) {
+            const staff = entry.facultyName.split(/[,/]+/).map((s: string) => s.trim().toLowerCase());
+            return staff.some((s: string) => {
+              if (s === targetNameLower) return true;
+              const strippedS = s.replace(/^(dr|mr|ms|mrs)\.?\s*/i, "");
+              const strippedTarget = targetNameLower.replace(/^(dr|mr|ms|mrs)\.?\s*/i, "");
+              return strippedS === strippedTarget;
+            });
+          }
+          return false;
         });
       }
     } catch (e) {
