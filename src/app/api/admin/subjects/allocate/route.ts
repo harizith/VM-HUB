@@ -77,15 +77,15 @@ export async function POST(req: Request) {
       const rawFacultyName = facultyName.trim();
 
       // Support multi-staff (e.g. "Staff 1, Staff 2" for labs, or "Staff 1, Staff 2, Staff 3" for electives)
-      const staffList = rawFacultyName.split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
-      const vmList = (vmsNo || "").split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
+      const staffList = rawFacultyName.split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+      const vmList = (vmsNo || "").split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
 
       for (let sIdx = 0; sIdx < staffList.length; sIdx++) {
         const staffName = staffList[sIdx];
         const staffVm = vmList[sIdx] || "";
 
         // Find user matching staffName or staffVm
-        const matchedUser = allUsers.find((u) => {
+        const matchedUser = allUsers.find((u: any) => {
           if (staffVm && (u.vmNo === staffVm || u.facultyProfile?.vmNo === staffVm)) return true;
           const uName = (u.name || "").toLowerCase().trim();
           const fName = staffName.toLowerCase();
