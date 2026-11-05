@@ -192,7 +192,7 @@ export async function POST(request: Request) {
     const teacherBusySlots = new Set<string>();
     for (const ent of otherClassEntries) {
       if (ent.facultyName?.trim() && ent.dayOrder && ent.period) {
-        const subNames = ent.facultyName.split(/[,/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+        const subNames = ent.facultyName.split(/[,/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
         for (const cleanName of subNames) {
           teacherBusySlots.add(`${cleanName}|${ent.dayOrder}|${ent.period}`);
         }
@@ -219,7 +219,7 @@ export async function POST(request: Request) {
     }
 
     // Build subject candidate pool with customized user periodsPerWeek & isContinuous block rules
-    const subjectPool: SubjectCandidate[] = catalogSubjects.map((sub, idx) => {
+    const subjectPool: SubjectCandidate[] = catalogSubjects.map((sub: any, idx: number) => {
       const code = sub.code.trim().toUpperCase();
       const name = sub.name.trim();
       const existingMeta = existingFacultyByCode.get(code);
@@ -792,7 +792,7 @@ export async function POST(request: Request) {
           const sName = staffList[idx];
           const sVm = vmList[idx] || '';
 
-          const matchedFp = allFacultyProfiles.find((fp) => {
+          const matchedFp = allFacultyProfiles.find((fp: any) => {
             if (sVm && (fp.vmNo === sVm || fp.user?.vmNo === sVm)) return true;
             const uName = (fp.user?.name || '').toLowerCase().trim();
             const fName = sName.toLowerCase().trim();
