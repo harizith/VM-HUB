@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       sportsConfig,
       libraryConfig,
       electiveConfig,
+      labConfig,
     } = body;
 
     if (!classId) {
@@ -416,8 +417,8 @@ export async function POST(request: Request) {
     }
 
     // =========================================================================
-    // PRIORITY 4: Labs (Every Lab Course gets 1 full 2-period continuous block)
-    // e.g. Pairs (1,2), (3,4), (5,6)
+    // PRIORITY 4: Labs (2-Period Continuous Blocks, e.g. Pairs 1-2, 3-4, 5-6, 7-8)
+    // Allows selecting exact lab subject (e.g. DS Lab, OOP Lab, OS Lab)
     // =========================================================================
     const labSubjects = subjectPool.filter((s) => s.isLab);
     const labPairs = [
@@ -427,7 +428,58 @@ export async function POST(request: Request) {
       [7, 8],
     ];
 
+    // Track allocated lab codes so they aren't duplicated
+    const allocatedLabCodes = new Set<string>();
+
+    // 4A. If user specified a dedicated Lab in Priority Slots Engine:
+    if (labConfig?.enabled === true && labConfig.subjectCode) {
+      const targetLabCode = String(labConfig.subjectCode).trim().toUpperCase();
+      const matchedLab = labSubjects.find((s) => s.code === targetLabCode) || {
+        code: targetLabCode,
+        name: labConfig.subjectName || targetLabCode,
+        isLab: true,
+        category: 'lab1',
+        credits: 2,
+        facultyName: labConfig.facultyName || null,
+        vmsNo: null,
+        roomNo: labConfig.roomNo || 'CS-LAB-1',
+        periodsPerWeek: 2,
+        isContinuous: true,
+      };
+
+      const preferredDay = labConfig.dayOrder || 'I';
+      const [lp1, lp2] = labConfig.periods && labConfig.periods.length === 2
+        ? labConfig.periods
+        : [1, 2];
+
+      const labFac = labConfig.facultyName || matchedLab.facultyName;
+      const labRoom = labConfig.roomNo || matchedLab.roomNo || 'CS-LAB-1';
+
+      if (isSlotFree(preferredDay, lp1) && isSlotFree(preferredDay, lp2)) {
+        assignSlot(preferredDay, lp1, {
+          code: matchedLab.code,
+          name: matchedLab.name,
+          facultyName: labFac,
+          roomNo: labRoom,
+          vmsNo: matchedLab.vmsNo,
+          category: matchedLab.category || 'lab1',
+        });
+        assignSlot(preferredDay, lp2, {
+          code: matchedLab.code,
+          name: matchedLab.name,
+          facultyName: labFac,
+          roomNo: labRoom,
+          vmsNo: matchedLab.vmsNo,
+          category: matchedLab.category || 'lab1',
+        });
+        allocatedLabCodes.add(matchedLab.code);
+      }
+    }
+
+    // 4B. Allocate remaining labs (each gets 1 full 2-period continuous block)
     for (const lab of labSubjects) {
+      if (allocatedLabCodes.has(lab.code)) continue;
+
       let allocated = false;
       const candidateDays = shuffleArray(DAYS);
 
@@ -459,6 +511,7 @@ export async function POST(request: Request) {
                 category: lab.category,
               });
               allocated = true;
+              allocatedLabCodes.add(lab.code);
               break;
             }
           }
@@ -718,6 +771,78 @@ export async function POST(request: Request) {
       });
     } catch (auditErr) {
       console.warn('Audit log creation failed for randomize timetable:', auditErr);
+    }
+
+    // 7. Auto-sync Faculty Profiles:
+    // Update FacultyProfile.lab1 with the exact assigned lab subject (e.g. 231CS32A DS Lab)
+    // and subject1/subject2 for theory so the faculty profile shows their exact laboratory assignment.
+    try {
+      const allFacultyProfiles = await prisma.facultyProfile.findMany({
+        include: { user: { select: { id: true, name: true, vmNo: true } } },
+      });
+
+      for (const entry of finalEntries) {
+        if (!entry.facultyName || !entry.subjectCode) continue;
+
+        const isLabEntry = isLabCourse(entry.subjectName, entry.subjectCode, entry.category);
+        const staffList = entry.facultyName.split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+        const vmList = (entry.vmsNo || '').split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+
+        for (let idx = 0; idx < staffList.length; idx++) {
+          const sName = staffList[idx];
+          const sVm = vmList[idx] || '';
+
+          const matchedFp = allFacultyProfiles.find((fp) => {
+            if (sVm && (fp.vmNo === sVm || fp.user?.vmNo === sVm)) return true;
+            const uName = (fp.user?.name || '').toLowerCase().trim();
+            const fName = sName.toLowerCase().trim();
+            return (
+              uName === fName ||
+              uName.replace(/^(dr|mr|ms|mrs)\.?\s*/i, '') === fName.replace(/^(dr|mr|ms|mrs)\.?\s*/i, '')
+            );
+          });
+
+          if (matchedFp) {
+            const cleanCode = entry.subjectCode.toUpperCase().trim();
+            const currentSubs = [
+              matchedFp.subject1,
+              matchedFp.subject2,
+              matchedFp.lab1,
+              matchedFp.additional1,
+              matchedFp.additional2,
+            ]
+              .filter(Boolean)
+              .map((s) => String(s).toUpperCase().trim());
+
+            if (isLabEntry) {
+              // Always ensure lab1 reflects this exact lab course
+              if (matchedFp.lab1?.toUpperCase().trim() !== cleanCode) {
+                await prisma.facultyProfile.update({
+                  where: { vmNo: matchedFp.vmNo },
+                  data: { lab1: cleanCode },
+                });
+                matchedFp.lab1 = cleanCode;
+              }
+            } else if (!currentSubs.includes(cleanCode)) {
+              let updateField = '';
+              if (!matchedFp.subject1) updateField = 'subject1';
+              else if (!matchedFp.subject2) updateField = 'subject2';
+              else if (!matchedFp.additional1) updateField = 'additional1';
+              else if (!matchedFp.additional2) updateField = 'additional2';
+
+              if (updateField) {
+                await prisma.facultyProfile.update({
+                  where: { vmNo: matchedFp.vmNo },
+                  data: { [updateField]: cleanCode },
+                });
+                (matchedFp as any)[updateField] = cleanCode;
+              }
+            }
+          }
+        }
+      }
+    } catch (profileSyncErr) {
+      console.warn('Non-blocking faculty profile sync after randomize timetable:', profileSyncErr);
     }
 
     return NextResponse.json({

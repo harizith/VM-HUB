@@ -136,6 +136,27 @@ export default function TeacherSubjectAllocation({
     roomNo: "AUDITORIUM",
   });
 
+  // Dedicated Priority Lab (2-Period continuous slot) Configuration
+  const [labPriorityConfig, setLabPriorityConfig] = useState<{
+    enabled: boolean;
+    subjectCode: string;
+    subjectName: string;
+    dayOrder: string;
+    periods: [number, number]; // e.g. [1, 2], [3, 4], [5, 6], [7, 8]
+    faculty1: string;
+    faculty2: string;
+    roomNo: string;
+  }>({
+    enabled: false,
+    subjectCode: "",
+    subjectName: "",
+    dayOrder: "I",
+    periods: [1, 2],
+    faculty1: "",
+    faculty2: "",
+    roomNo: "CS-LAB-1",
+  });
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "LAB" | "THEORY">("ALL");
@@ -632,6 +653,11 @@ export default function TeacherSubjectAllocation({
         electiveConfig.faculty3,
       ].filter(Boolean).join(", ") || electiveConfig.facultyName || "Elective Coordinator";
 
+      const combinedLabFaculty = [
+        labPriorityConfig.faculty1,
+        labPriorityConfig.faculty2,
+      ].filter(Boolean).join(", ");
+
       const res = await fetch("/api/admin/timetable/randomize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -644,6 +670,10 @@ export default function TeacherSubjectAllocation({
           electiveConfig: {
             ...electiveConfig,
             facultyName: combinedElectiveFaculty,
+          },
+          labConfig: {
+            ...labPriorityConfig,
+            facultyName: combinedLabFaculty,
           },
         }),
       }).then((r) => r.json());
@@ -1038,7 +1068,130 @@ export default function TeacherSubjectAllocation({
               </div>
             </div>
 
-            {/* 3. Library Priority */}
+            {/* 3. Priority Lab (2 Continuous Periods) */}
+            <div style={{ padding: "0.85rem", borderRadius: "10px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#f59e0b", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={labPriorityConfig.enabled}
+                    onChange={(e) => setLabPriorityConfig({ ...labPriorityConfig, enabled: e.target.checked })}
+                    style={{ accentColor: "#f59e0b", cursor: "pointer" }}
+                  />
+                  2. Lab (2 Continuous Periods)
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Exact Lab Subject</span>
+              </div>
+
+              {/* Lab Subject Selector */}
+              <div style={{ marginBottom: "0.5rem" }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Select Lab Subject</span>
+                <select
+                  disabled={!labPriorityConfig.enabled}
+                  value={labPriorityConfig.subjectCode}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    const matched = catalogSubjects.find((s) => s.code === code);
+                    const defaultFac = assignments[code]?.facultyName || "";
+                    const facList = defaultFac.split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
+                    setLabPriorityConfig({
+                      ...labPriorityConfig,
+                      subjectCode: code,
+                      subjectName: matched?.name || code,
+                      faculty1: facList[0] || labPriorityConfig.faculty1 || "",
+                      faculty2: facList[1] || labPriorityConfig.faculty2 || "",
+                    });
+                  }}
+                  className="premium-input"
+                  style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                >
+                  <option value="">-- Choose Lab Subject (e.g. DS Lab, OOP Lab) --</option>
+                  {relevantSubjects
+                    .filter((s) => s.name.toLowerCase().includes("lab") || s.code.toLowerCase().includes("lab"))
+                    .map((s) => (
+                      <option key={s.id || s.code} value={s.code}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Day Order</span>
+                  <select
+                    disabled={!labPriorityConfig.enabled}
+                    value={labPriorityConfig.dayOrder}
+                    onChange={(e) => setLabPriorityConfig({ ...labPriorityConfig, dayOrder: e.target.value })}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    {["I", "II", "III", "IV", "V"].map((d) => (
+                      <option key={d} value={d}>Day Order {d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block" }}>Time Slot</span>
+                  <select
+                    disabled={!labPriorityConfig.enabled}
+                    value={`${labPriorityConfig.periods[0]}-${labPriorityConfig.periods[1]}`}
+                    onChange={(e) => {
+                      const [p1, p2] = e.target.value.split("-").map(Number);
+                      setLabPriorityConfig({ ...labPriorityConfig, periods: [p1, p2] });
+                    }}
+                    className="premium-input"
+                    style={{ width: "100%", fontSize: "0.75rem", padding: "0.35rem" }}
+                  >
+                    <option value="1-2">Periods 1 & 2 (Morning Block)</option>
+                    <option value="3-4">Periods 3 & 4 (Mid-Day Block)</option>
+                    <option value="5-6">Periods 5 & 6 (Afternoon Block)</option>
+                    <option value="7-8">Periods 7 & 8 (Last 2 Periods)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Lab Faculty Selectors */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", paddingTop: "0.35rem", borderTop: "1px dashed var(--border-subtle)" }}>
+                <span style={{ fontSize: "0.68rem", fontWeight: "700", color: "#f59e0b" }}>
+                  Lab Incharge & Co-Incharge Faculty:
+                </span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", display: "block" }}>Staff 1 (Incharge)</span>
+                    <select
+                      disabled={!labPriorityConfig.enabled}
+                      value={labPriorityConfig.faculty1}
+                      onChange={(e) => setLabPriorityConfig({ ...labPriorityConfig, faculty1: e.target.value })}
+                      className="premium-input"
+                      style={{ width: "100%", fontSize: "0.72rem", padding: "0.25rem 0.35rem" }}
+                    >
+                      <option value="">-- Select Lab Staff 1 --</option>
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", display: "block" }}>Staff 2 (Co-Incharge)</span>
+                    <select
+                      disabled={!labPriorityConfig.enabled}
+                      value={labPriorityConfig.faculty2}
+                      onChange={(e) => setLabPriorityConfig({ ...labPriorityConfig, faculty2: e.target.value })}
+                      className="premium-input"
+                      style={{ width: "100%", fontSize: "0.72rem", padding: "0.25rem 0.35rem" }}
+                    >
+                      <option value="">-- Select Lab Staff 2 --</option>
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Library Priority */}
             <div style={{ padding: "0.85rem", borderRadius: "10px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
                 <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#fbbf24", display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -1048,7 +1201,7 @@ export default function TeacherSubjectAllocation({
                     onChange={(e) => setLibraryConfig({ ...libraryConfig, enabled: e.target.checked })}
                     style={{ accentColor: "#fbbf24", cursor: "pointer" }}
                   />
-                  3. Library (1 Period/Wk)
+                  4. Library (1 Period/Wk)
                 </label>
                 <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Single Period</span>
               </div>

@@ -104,31 +104,37 @@ export async function POST(req: Request) {
 
             let updateData: any = {};
             if (profile) {
-              const currentSubs = [
-                profile.subject1,
-                profile.subject2,
-                profile.lab1,
-                profile.additional1,
-                profile.additional2,
-              ]
-                .filter(Boolean)
-                .map((s) => String(s).toUpperCase().trim());
-
-              if (!currentSubs.includes(cleanCode)) {
-                if (isLab && !profile.lab1) {
+              if (isLab) {
+                // If it is a lab subject, ensure lab1 is updated with this exact lab code
+                if (profile.lab1?.toUpperCase().trim() !== cleanCode) {
                   updateData.lab1 = cleanCode;
-                } else if (!profile.subject1) {
-                  updateData.subject1 = cleanCode;
-                } else if (!profile.subject2) {
-                  updateData.subject2 = cleanCode;
-                } else if (!profile.additional1) {
-                  updateData.additional1 = cleanCode;
-                } else if (!profile.additional2) {
-                  updateData.additional2 = cleanCode;
-                } else {
-                  updateData.subject1 = cleanCode;
                 }
+              } else {
+                const currentSubs = [
+                  profile.subject1,
+                  profile.subject2,
+                  profile.additional1,
+                  profile.additional2,
+                ]
+                  .filter(Boolean)
+                  .map((s) => String(s).toUpperCase().trim());
 
+                if (!currentSubs.includes(cleanCode)) {
+                  if (!profile.subject1) {
+                    updateData.subject1 = cleanCode;
+                  } else if (!profile.subject2) {
+                    updateData.subject2 = cleanCode;
+                  } else if (!profile.additional1) {
+                    updateData.additional1 = cleanCode;
+                  } else if (!profile.additional2) {
+                    updateData.additional2 = cleanCode;
+                  } else {
+                    updateData.subject1 = cleanCode;
+                  }
+                }
+              }
+
+              if (Object.keys(updateData).length > 0) {
                 await prisma.facultyProfile.update({
                   where: { vmNo: userVmNo },
                   data: updateData,
@@ -140,7 +146,7 @@ export async function POST(req: Request) {
                 data: {
                   vmNo: userVmNo,
                   department: departmentCode || "CSE",
-                  subject1: cleanCode,
+                  ...(isLab ? { lab1: cleanCode } : { subject1: cleanCode }),
                 },
               });
             }
