@@ -298,7 +298,7 @@ export default function TeacherSubjectAllocation({
   }, [initialTargetCourse]);
 
   // Scope filter: "SEMESTER" (default for target class), "ALL_CATALOG" (every course catalog subject), or specific semester "1".."8"
-  const [semesterFilter, setSemesterFilter] = useState<string>("ALL_CATALOG");
+  const [semesterFilter, setSemesterFilter] = useState<string>("SEMESTER");
 
   // Filter subjects based on scope, department, semester, search, and lab/theory
   const relevantSubjects = useMemo(() => {
@@ -1104,7 +1104,9 @@ export default function TeacherSubjectAllocation({
       >
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <div>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Subjects In Catalog</span>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              {semesterFilter === "ALL_CATALOG" ? "All Catalog Subjects" : `Subjects for ${computedClassId}`}
+            </span>
             <div style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-main)" }}>
               {relevantSubjects.length}
             </div>
@@ -1289,9 +1291,9 @@ export default function TeacherSubjectAllocation({
               }}
               title="Filter subjects shown in allocation table"
             >
-              <option value="ALL_CATALOG">📚 All Course Catalog Subjects ({catalogSubjects.length})</option>
+              <option value="SEMESTER">📌 Current Class ({selectedDept} Sem {computedSemester})</option>
               <option value="YEAR">🎯 Target Year {selectedYear} (Sem {computedSemester}-{computedSemester + 1})</option>
-              <option value="SEMESTER">📌 Target Semester {computedSemester}</option>
+              <option value="ALL_CATALOG">📚 All Course Catalog Subjects ({catalogSubjects.length})</option>
               <option disabled>──────────</option>
               <option value="1">Semester 1</option>
               <option value="2">Semester 2</option>
