@@ -196,26 +196,25 @@ export async function POST(req: Request) {
       });
     }
 
-    // 4. Sync UserMode for login compatibility
-    if (cleanVmNo) {
-      try {
-        await prisma.userMode.upsert({
-          where: { vmno: cleanVmNo },
-          update: {
-            emailid: cleanEmail,
-            password: storedPassword,
-            usermode: validRole,
-          },
-          create: {
-            vmno: cleanVmNo,
-            emailid: cleanEmail,
-            password: storedPassword,
-            usermode: validRole,
-          },
-        });
-      } catch (err) {
-        console.warn("Could not sync UserMode:", err);
-      }
+    // 4. Store and sync UserMode for dashboard login
+    const targetVmNo = cleanVmNo || cleanEmail.split("@")[0].toUpperCase();
+    try {
+      await prisma.userMode.upsert({
+        where: { vmno: targetVmNo },
+        update: {
+          emailid: cleanEmail,
+          password: storedPassword,
+          usermode: validRole,
+        },
+        create: {
+          vmno: targetVmNo,
+          emailid: cleanEmail,
+          password: storedPassword,
+          usermode: validRole,
+        },
+      });
+    } catch (err) {
+      console.warn("Could not sync UserMode:", err);
     }
 
     // 5. Log audit event
@@ -261,8 +260,15 @@ export async function DELETE(req: Request) {
       select: { email: true, name: true, vmNo: true, role: true },
     });
 
-    if (user?.vmNo) {
-      await prisma.userMode.deleteMany({ where: { vmno: user.vmNo } });
+    if (user?.vmNo || user?.email) {
+      await prisma.userMode.deleteMany({
+        where: {
+          OR: [
+            ...(user.vmNo ? [{ vmno: user.vmNo }] : []),
+            ...(user.email ? [{ emailid: user.email }] : []),
+          ],
+        },
+      }).catch(() => null);
     }
 
     await prisma.user.delete({
