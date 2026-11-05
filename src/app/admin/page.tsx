@@ -109,6 +109,7 @@ interface TimetableEntry {
   facultyName: string;
   roomNo: string;
   vmsNo?: string | null;
+  semType?: string | null;
 }
 
 
@@ -2071,9 +2072,24 @@ export default function AdminPage() {
                                               {timetableMode === "faculty" ? `Class: ${entry.classId || "-"}` : `Faculty: ${entry.facultyName || "-"}`}
                                             </span>
                                           )}
-                                          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", backgroundColor: "rgba(255,255,255,0.05)", padding: "0.1rem 0.3rem", borderRadius: "4px", alignSelf: "flex-start" }}>
-                                            {entry.roomNo || "LH-101"}
-                                          </span>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "1px", flexWrap: "wrap" }}>
+                                            <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", backgroundColor: "rgba(255,255,255,0.05)", padding: "0.1rem 0.3rem", borderRadius: "4px" }}>
+                                              {entry.roomNo || "LH-101"}
+                                            </span>
+                                            {entry.semType && (
+                                              <span style={{
+                                                fontSize: "0.62rem",
+                                                fontWeight: 700,
+                                                padding: "0.08rem 0.35rem",
+                                                borderRadius: "4px",
+                                                backgroundColor: entry.semType.toUpperCase() === "ODD" ? "rgba(168, 85, 247, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                                                color: entry.semType.toUpperCase() === "ODD" ? "#c084fc" : "#10b981",
+                                                border: entry.semType.toUpperCase() === "ODD" ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                                              }}>
+                                                Sem ({entry.semType.toUpperCase() === "ODD" ? "Odd" : "Even"})
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -3694,7 +3710,22 @@ export default function AdminPage() {
                                         <div key={mIdx} style={{ display: "flex", flexDirection: "column", gap: "0.15rem", marginBottom: matching.length > 1 ? "0.3rem" : "0" }}>
                                           <strong style={{ color: "var(--sky-blue)", fontSize: "0.8rem" }}>{m.subjectName || m.subjectCode || "-"}</strong>
                                           <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{m.facultyName || "No Faculty"}</span>
-                                          {m.roomNo && <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>Room: {m.roomNo}</span>}
+                                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexWrap: "wrap" }}>
+                                            {m.roomNo && <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>Room: {m.roomNo}</span>}
+                                            {(m.semType || selectedHistoryVersion.semType) && (
+                                              <span style={{
+                                                fontSize: "0.6rem",
+                                                fontWeight: 700,
+                                                padding: "0.05rem 0.3rem",
+                                                borderRadius: "3px",
+                                                backgroundColor: (m.semType || selectedHistoryVersion.semType).toUpperCase() === "ODD" ? "rgba(168, 85, 247, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                                                color: (m.semType || selectedHistoryVersion.semType).toUpperCase() === "ODD" ? "#c084fc" : "#10b981",
+                                                border: (m.semType || selectedHistoryVersion.semType).toUpperCase() === "ODD" ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                                              }}>
+                                                Sem ({(m.semType || selectedHistoryVersion.semType).toUpperCase() === "ODD" ? "Odd" : "Even"})
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
                                       ))
                                     ) : (

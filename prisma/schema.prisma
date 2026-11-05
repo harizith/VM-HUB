@@ -150,6 +150,7 @@ model TimetableEntry {
   roomNo      String?
   vmsNo       String?
   category    String?  // sub1, sub2, sub3, lab1, lab2, pe, oe, additional1, additional2
+  semType     String?  // "ODD" or "EVEN"
   createdAt   DateTime @default(now())
   
   @@index([classId, dayOrder])
@@ -162,6 +163,7 @@ model TimetableHistory {
   classId         String?  // e.g., "II-CSE-A"
   academicYear    String?  // e.g., "2025-2026" or year/sem label
   semester        Int?     // e.g., 3, 4, 5
+  semType         String?  // "ODD" or "EVEN"
   changeReason    String?  // e.g., "Next Year / Semester Update", "Manual Edit", "Import"
   archivedBy      String?  // e.g., "admin@vtmt.org"
   dayOrder        String?

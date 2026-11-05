@@ -277,6 +277,7 @@ export async function PUT(request: Request) {
             roomNo: e.roomNo,
             vmsNo: e.vmsNo,
             category: e.category,
+            semType: e.semType || null,
             originalCreated: e.createdAt,
           })),
         });
@@ -304,6 +305,7 @@ export async function PUT(request: Request) {
         roomNo: entry.roomNo || null,
         vmsNo: typeof entry.vmsNo === 'string' ? entry.vmsNo.trim() || null : null,
         category: entry.category || null,
+        semType: entry.semType || (semester ? (Number(semester) % 2 !== 0 ? 'ODD' : 'EVEN') : null),
       })),
     });
 

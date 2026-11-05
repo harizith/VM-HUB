@@ -182,6 +182,9 @@ export async function POST(req: Request) {
       // If classId is provided, sync or create active timetable slot for this subject in this class
       if (classId) {
         try {
+          const semNum = existingSub?.semester || 3;
+          const semType = semNum % 2 !== 0 ? "ODD" : "EVEN";
+
           const updateResult = await prisma.timetableEntry.updateMany({
             where: {
               classId: { in: classAliases.length > 0 ? classAliases : [classId] },
@@ -190,6 +193,7 @@ export async function POST(req: Request) {
             data: {
               facultyName: rawFacultyName,
               vmsNo: vmsNo || null,
+              semType,
               ...(roomNo ? { roomNo } : {}),
             },
           });
@@ -207,6 +211,7 @@ export async function POST(req: Request) {
                 roomNo: roomNo || null,
                 period: 1,
                 dayOrder: "I",
+                semType,
               },
             });
           }

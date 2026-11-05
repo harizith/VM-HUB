@@ -352,6 +352,10 @@ export default function TeacherSubjectAllocation({
         matchSem = allowedSems.includes(s.semester);
       } else if (semesterFilter === "SEMESTER") {
         matchSem = s.semester === computedSemester;
+      } else if (semesterFilter === "ODD_SEMS") {
+        matchSem = s.semester % 2 !== 0;
+      } else if (semesterFilter === "EVEN_SEMS") {
+        matchSem = s.semester % 2 === 0;
       } else if (semesterFilter !== "ALL") {
         const targetSem = parseInt(semesterFilter);
         if (!isNaN(targetSem)) {
@@ -1329,14 +1333,17 @@ export default function TeacherSubjectAllocation({
               <option value="YEAR">🎯 Target Year {selectedYear} (Sem {computedSemester}-{computedSemester + 1})</option>
               <option value="ALL_CATALOG">📚 All Course Catalog Subjects ({catalogSubjects.length})</option>
               <option disabled>──────────</option>
-              <option value="1">Semester 1</option>
-              <option value="2">Semester 2</option>
-              <option value="3">Semester 3</option>
-              <option value="4">Semester 4</option>
-              <option value="5">Semester 5</option>
-              <option value="6">Semester 6</option>
-              <option value="7">Semester 7</option>
-              <option value="8">Semester 8</option>
+              <option value="ODD_SEMS">🟣 Odd Semesters (Sem 1, 3, 5, 7)</option>
+              <option value="EVEN_SEMS">🟢 Even Semesters (Sem 2, 4, 6, 8)</option>
+              <option disabled>──────────</option>
+              <option value="1">Semester 1 (Odd)</option>
+              <option value="2">Semester 2 (Even)</option>
+              <option value="3">Semester 3 (Odd)</option>
+              <option value="4">Semester 4 (Even)</option>
+              <option value="5">Semester 5 (Odd)</option>
+              <option value="6">Semester 6 (Even)</option>
+              <option value="7">Semester 7 (Odd)</option>
+              <option value="8">Semester 8 (Even)</option>
             </select>
 
             {/* Search */}
@@ -1462,6 +1469,7 @@ export default function TeacherSubjectAllocation({
                 <tr>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>CODE</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600" }}>SUBJECT NAME</th>
+                  <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "125px" }}>SEM (ODD/EVEN)</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "80px" }}>TYPE</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", minWidth: "220px" }}>ASSIGNED TEACHER / FACULTY</th>
                   <th style={{ padding: "0.75rem 1rem", color: "var(--text-muted)", fontWeight: "600", width: "110px" }}>PERIODS / WK</th>
@@ -1510,6 +1518,31 @@ export default function TeacherSubjectAllocation({
                         <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
                           Dept: <strong style={{ color: "var(--sky-blue)" }}>{sub.departmentCode || "ALL"}</strong> • Sem {sub.semester} • Credits: {sub.credits}
                         </span>
+                      </td>
+                      <td style={{ padding: "0.75rem 1rem" }}>
+                        {(() => {
+                          const semNum = Number(sub.semester) || 1;
+                          const isOdd = semNum % 2 !== 0;
+                          return (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.3rem",
+                                padding: "0.2rem 0.55rem",
+                                borderRadius: "6px",
+                                fontSize: "0.72rem",
+                                fontWeight: "700",
+                                backgroundColor: isOdd ? "rgba(168, 85, 247, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                                color: isOdd ? "#c084fc" : "#10b981",
+                                border: isOdd ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              Sem {semNum} ({isOdd ? "Odd" : "Even"})
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: "0.75rem 1rem" }}>
                         <span

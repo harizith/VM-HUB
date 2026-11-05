@@ -28,6 +28,7 @@ interface TimetablePreviewRow {
   vmsNo?: string;
   roomNo: string | null;
   category?: string;
+  semType?: string | null;
 }
 
 export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
@@ -47,6 +48,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Class ID": "II-CSE-A",
       "Day Order": "I",
       "Period": 1,
+      "Sem (Odd/Even)": "Odd",
       "Subject Code": "CS3351",
       "Subject Name": "Digital Principles & System Design",
       "Subject Category": "sub1",
@@ -59,6 +61,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Class ID": "II-CSE-A",
       "Day Order": "I",
       "Period": 2,
+      "Sem (Odd/Even)": "Odd",
       "Subject Code": "CS3352",
       "Subject Name": "Foundations of Data Science",
       "Subject Category": "sub2",
@@ -71,6 +74,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Class ID": "II-CSE-A",
       "Day Order": "I",
       "Period": 3,
+      "Sem (Odd/Even)": "Odd",
       "Subject Code": "CS3391",
       "Subject Name": "Object Oriented Programming",
       "Subject Category": "lab1",
@@ -83,6 +87,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
       "Class ID": "IV-CSE-B",
       "Day Order": "II",
       "Period": 1,
+      "Sem (Odd/Even)": "Odd",
       "Subject Code": "CS3701",
       "Subject Name": "Cloud Computing & DevOps",
       "Subject Category": "pe",
@@ -187,6 +192,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
             vmsNo: getCell(r, "VMS No", "VM No", "VMS Number") || undefined,
             roomNo: nullableCell(getCell(r, "Room No", "Room")),
             category: getCell(r, "Subject Category", "Category").toLowerCase() || undefined,
+            semType: nullableCell(getCell(r, "Sem (Odd/Even)", "Sem", "Semester", "Sem Type", "Semester Type")),
           };
         }).filter((row, index) => Object.values(json[index]).some(value => String(value ?? "").trim() !== ""));
 
@@ -583,6 +589,7 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>CLASS</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>DAY</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>PERIOD</th>
+                  <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>SEM (ODD/EVEN)</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>TIME RANGE</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>SUBJECT CODE</th>
                   <th style={{ padding: "0.6rem 0.75rem", color: "var(--text-muted)" }}>SUBJECT NAME</th>
@@ -598,6 +605,19 @@ export default function AdminTimetableExcelUpload({ onUploadSuccess }: { onUploa
                     <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--sky-blue)" }}>{row.classId || "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700", color: "var(--text-main)" }}>{row.dayOrder ? `Day ${row.dayOrder}` : "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", fontWeight: "700" }}>{row.period ? `P${row.period}` : "—"}</td>
+                    <td style={{ padding: "0.55rem 0.75rem" }}>
+                      <span style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        padding: "0.1rem 0.4rem",
+                        borderRadius: "4px",
+                        backgroundColor: (row.semType?.toUpperCase() === "ODD" || !row.semType) ? "rgba(168, 85, 247, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                        color: (row.semType?.toUpperCase() === "ODD" || !row.semType) ? "#c084fc" : "#10b981",
+                        border: (row.semType?.toUpperCase() === "ODD" || !row.semType) ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                      }}>
+                        {row.semType || "Odd"}
+                      </span>
+                    </td>
                     <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-muted)" }}>{row.timeRange || "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", fontFamily: "monospace" }}>{row.subjectCode || "—"}</td>
                     <td style={{ padding: "0.55rem 0.75rem", color: "var(--text-main)" }}>{row.subjectName || "—"}</td>

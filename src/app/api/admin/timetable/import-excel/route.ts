@@ -27,8 +27,8 @@ function cell(row: Record<string, unknown>, ...names: string[]) {
   return key === undefined ? "" : String(row[key] ?? "").trim();
 }
 
-function optionalText(value: string) {
-  return value || null;
+function optionalText(value: string | null | undefined) {
+  return value ? String(value).trim() || null : null;
 }
 
 export async function POST(req: Request) {
@@ -58,8 +58,9 @@ export async function POST(req: Request) {
       const vmsNo = cell(raw, "vmsNo", "vms_no", "vmNo", "vmno", "VMS No", "VM No");
       const rawTimeRange = cell(raw, "timeRange", "time_range", "time", "Time Range");
       const category = cell(raw, "category", "slotCategory", "subjectCategory", "Subject Category");
+      const rawSemType = cell(raw, "semType", "sem", "semester", "Sem (Odd/Even)", "Sem Type", "Semester Type");
 
-      const hasValue = [classId, rawDayOrder, rawPeriod, subjectCode, subjectName, facultyName, roomNo, vmsNo, rawTimeRange, category]
+      const hasValue = [classId, rawDayOrder, rawPeriod, subjectCode, subjectName, facultyName, roomNo, vmsNo, rawTimeRange, category, rawSemType]
         .some((value) => value !== "");
       if (!hasValue) {
         warnings.push(`Row ${rowNum}: ignored because it contains no timetable data`);
@@ -70,6 +71,14 @@ export async function POST(req: Request) {
       if (rawDayOrder && !dayOrder) warnings.push(`Row ${rowNum}: unrecognized day order stored as entered`);
       const period = normalizePeriod(rawPeriod);
       if (rawPeriod && period === null) warnings.push(`Row ${rowNum}: invalid period kept unset`);
+
+      let semType: string | null = null;
+      if (rawSemType) {
+        const lower = rawSemType.toLowerCase();
+        if (lower.includes("odd") || lower === "1" || lower === "3" || lower === "5" || lower === "7") semType = "ODD";
+        else if (lower.includes("even") || lower === "2" || lower === "4" || lower === "6" || lower === "8") semType = "EVEN";
+        else semType = rawSemType.toUpperCase();
+      }
 
       validEntries.push({
         classId: optionalText(classId),
@@ -82,6 +91,7 @@ export async function POST(req: Request) {
         roomNo: optionalText(roomNo),
         vmsNo: optionalText(vmsNo),
         category: optionalText(category.toLowerCase()),
+        semType: optionalText(semType),
       });
     });
 

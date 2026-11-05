@@ -714,6 +714,7 @@ export async function POST(request: Request) {
             roomNo: ent.roomNo || null,
             vmsNo: ent.vmsNo || null,
             category: ent.category || 'sub1',
+            semType: semester ? (semester % 2 !== 0 ? 'ODD' : 'EVEN') : 'ODD',
           });
         }
       }
@@ -727,6 +728,8 @@ export async function POST(request: Request) {
           data: existingEntries.map((e: any) => ({
             versionId,
             classId: e.classId || classId,
+            semester: semester || null,
+            semType: e.semType || (semester ? (semester % 2 !== 0 ? 'ODD' : 'EVEN') : 'ODD'),
             changeReason: `Automated Schedule Generation / Shuffle (${classId})`,
             archivedBy: authorization.email,
             dayOrder: e.dayOrder,

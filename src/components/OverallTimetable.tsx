@@ -15,6 +15,7 @@ export interface TimetableEntry {
   roomNo: string;
   vmsNo?: string | null;
   category?: string | null;
+  semType?: string | null;
 }
 
 export interface UserDetailsProps {
@@ -83,7 +84,7 @@ export default function OverallTimetable({
 
   // Calculate unique subjects for the official document subject table
   const allSlots = Object.values(timetableMap).flat();
-  const uniqueSubjects: { code: string; name: string; faculty: string; room: string; hours: number }[] = [];
+  const uniqueSubjects: { code: string; name: string; faculty: string; room: string; hours: number; semType?: string | null }[] = [];
   allSlots.forEach(slot => {
     if (!slot.subjectCode || slot.subjectCode === "-" || slot.subjectCode === "LUNCH") return;
     const existing = uniqueSubjects.find(s => s.code === slot.subjectCode && s.name === slot.subjectName);
@@ -92,13 +93,17 @@ export default function OverallTimetable({
       if (slot.facultyName && slot.facultyName.includes(",") && !existing.faculty.includes(",")) {
         existing.faculty = slot.facultyName;
       }
+      if (!existing.semType && slot.semType) {
+        existing.semType = slot.semType;
+      }
     } else {
       uniqueSubjects.push({
         code: slot.subjectCode,
         name: slot.subjectName,
         faculty: slot.facultyName || facultyName || "Faculty",
         room: slot.roomNo || "Room",
-        hours: 1
+        hours: 1,
+        semType: slot.semType || null,
       });
     }
   });
@@ -413,17 +418,33 @@ export default function OverallTimetable({
                                 })()}
                               </div>
 
-                              {/* 3. Room Number */}
-                              {entry?.roomNo && (
-                                <div style={{
-                                  fontSize: "0.72rem",
-                                  fontWeight: "600",
-                                  color: "var(--text-muted)",
-                                  opacity: 0.85
-                                }}>
-                                  {entry.roomNo}
-                                </div>
-                              )}
+                              {/* 3. Room Number & Sem (Odd/Even) */}
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap", marginTop: "2px" }}>
+                                {entry?.roomNo && (
+                                  <div style={{
+                                    fontSize: "0.72rem",
+                                    fontWeight: "600",
+                                    color: "var(--text-muted)",
+                                    opacity: 0.85
+                                  }}>
+                                    {entry.roomNo}
+                                  </div>
+                                )}
+                                {entry?.semType && (
+                                  <span style={{
+                                    fontSize: "0.62rem",
+                                    fontWeight: 700,
+                                    padding: "0.08rem 0.35rem",
+                                    borderRadius: "4px",
+                                    backgroundColor: entry.semType.toUpperCase() === "ODD" ? "rgba(168, 85, 247, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                                    color: entry.semType.toUpperCase() === "ODD" ? "#c084fc" : "#10b981",
+                                    border: entry.semType.toUpperCase() === "ODD" ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                                    lineHeight: 1.2
+                                  }}>
+                                    Sem ({entry.semType.toUpperCase() === "ODD" ? "Odd" : "Even"})
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <div style={{ minHeight: "45px", display: "flex", alignItems: "center" }}>
@@ -684,11 +705,18 @@ export default function OverallTimetable({
                   <div>
                     <strong>Branch:</strong> CSE
                   </div>
-                  {mode === "student" && userDetails?.semester && (
-                    <div>
-                      <strong>Semester:</strong> {userDetails.semester}
-                    </div>
-                  )}
+                  <div>
+                    <strong>Semester:</strong>{" "}
+                    {(() => {
+                      const semVal = userDetails?.semester;
+                      if (!semVal) {
+                        return "Sem 3 (Odd)";
+                      }
+                      const num = Number(semVal);
+                      if (isNaN(num)) return `${semVal}`;
+                      return `Sem ${num} (${num % 2 !== 0 ? "Odd" : "Even"})`;
+                    })()}
+                  </div>
                   <div>
                     <strong>Status:</strong> Active Regular
                   </div>
@@ -809,6 +837,7 @@ export default function OverallTimetable({
                       <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "35px" }}>S.No</th>
                       <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "85px" }}>Subject Code</th>
                       <th style={{ border: "1px solid #000000", padding: "4px 6px" }}>Subject Name</th>
+                      <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "85px", textAlign: "center" }}>Sem (Odd/Even)</th>
                       <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "120px" }}>Handled By / Class</th>
                       <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "70px" }}>Room No</th>
                       <th style={{ border: "1px solid #000000", padding: "4px 6px", width: "55px", textAlign: "center" }}>Periods</th>
@@ -816,19 +845,29 @@ export default function OverallTimetable({
                   </thead>
                   <tbody>
                     {uniqueSubjects.length > 0 ? (
-                      uniqueSubjects.map((sub, sIdx) => (
-                        <tr key={sub.code + sIdx}>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center" }}>{sIdx + 1}</td>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px", fontWeight: "bold" }}>{sub.code}</td>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.name}</td>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.faculty}</td>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.room}</td>
-                          <td style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center", fontWeight: "bold" }}>{sub.hours}</td>
-                        </tr>
-                      ))
+                      uniqueSubjects.map((sub, sIdx) => {
+                        const semLabel = sub.semType
+                          ? `Sem (${sub.semType.toUpperCase() === "ODD" ? "Odd" : "Even"})`
+                          : userDetails?.semester
+                          ? `Sem ${userDetails.semester} (${Number(userDetails.semester) % 2 !== 0 ? "Odd" : "Even"})`
+                          : "Sem (Odd)";
+                        return (
+                          <tr key={sub.code + sIdx}>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center" }}>{sIdx + 1}</td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px", fontWeight: "bold" }}>{sub.code}</td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.name}</td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center", fontWeight: "600", fontSize: "7.5pt" }}>
+                              {semLabel}
+                            </td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.faculty}</td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px" }}>{sub.room}</td>
+                            <td style={{ border: "1px solid #000000", padding: "4px 6px", textAlign: "center", fontWeight: "bold" }}>{sub.hours}</td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
-                        <td colSpan={6} style={{ border: "1px solid #000000", padding: "8px", textAlign: "center", color: "#666" }}>
+                        <td colSpan={7} style={{ border: "1px solid #000000", padding: "8px", textAlign: "center", color: "#666" }}>
                           No subject assignments mapped in this timetable.
                         </td>
                       </tr>
