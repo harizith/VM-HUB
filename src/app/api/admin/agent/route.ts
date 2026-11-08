@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import Groq from 'groq-sdk';
 import { hashPassword } from '@/lib/encryption';
+import { requireAdmin } from '@/lib/adminAuth';
 
 const apiKeys = [
   process.env.GROQ_API_KEY,
@@ -67,7 +68,7 @@ async function createCompletionWithFailover(messages: any[], tools?: any[]) {
 }
 
 // Disallow dangerous SQL commands in AI queries
-const DESTRUCTIVE_SQL_PATTERN = /\b(DROP|TRUNCATE|ALTER|GRANT|REVOKE|DATABASE|SCHEMA|SHUTDOWN)\b/i;
+const DESTRUCTIVE_SQL_PATTERN = /\b(DROP|TRUNCATE|ALTER|GRANT|REVOKE|DATABASE|SCHEMA|SHUTDOWN|INSERT|UPDATE|DELETE|MERGE|COPY|CALL|EXECUTE|SET|DO|LOCK|VACUUM|pg_[a-z_]+)\b/i;
 
 // Ultra-compact system prompt minimizing input tokens
 const SYSTEM_PROMPT = `Admin assistant for VM-HUB academic portal.
@@ -153,6 +154,10 @@ const TOOLS = [
 ];
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const { query, attachedData, history } = await request.json();
     
@@ -212,11 +217,18 @@ export async function POST(request: Request) {
           dbResult = 'Error: Only SELECT queries permitted.';
         } else if (DESTRUCTIVE_SQL_PATTERN.test(trimmed)) {
           dbResult = 'Error: Destructive SQL forbidden.';
-        } else if (/password/i.test(trimmed)) {
-          dbResult = 'Error: Access to password hashes restricted.';
+        } else if (/password/i.test(trimmed) || /\bselect\s+(distinct\s+)?\*|\w\.\*/i.test(trimmed)) {
+          // "SELECT *" is rejected too, since it would return the password column
+          dbResult = 'Error: Select explicit columns; password hashes are restricted.';
+        } else if (trimmed.replace(/;\s*$/, '').includes(';')) {
+          dbResult = 'Error: Only a single statement is permitted.';
         } else {
           try {
-            dbResult = await prisma.$queryRawUnsafe(sqlQuery);
+            // Enforce read-only at the database level, regardless of the keyword filter above
+            dbResult = await prisma.$transaction(async (tx) => {
+              await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+              return tx.$queryRawUnsafe(trimmed.replace(/;\s*$/, ''));
+            });
           } catch (err: any) {
             errorStr = err.message;
             dbResult = `DB error: ${errorStr}`;
@@ -302,7 +314,9 @@ export async function POST(request: Request) {
       messages.push(currentMessage);
       
       // Limit DB result output fed back to Groq to 600 characters (down from 2000)
-      let resultString = typeof dbResult === 'string' ? dbResult : JSON.stringify(dbResult);
+      let resultString = typeof dbResult === 'string'
+        ? dbResult
+        : JSON.stringify(dbResult, (_k, v) => (typeof v === 'bigint' ? Number(v) : v));
       if (resultString.length > 600) {
         resultString = resultString.substring(0, 600) + '... [truncated]';
       }

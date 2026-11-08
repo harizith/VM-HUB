@@ -2,14 +2,13 @@
 
 import { useState, FormEvent } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -45,74 +44,73 @@ export default function LoginForm() {
         }
       } else {
         console.error("SignIn failed:", res);
-        setErrorMsg("Invalid credentials. Please check your email and password.");
+        setErrorMsg("The email or password is incorrect. Check both and try again.");
         setIsLoading(false);
       }
     } catch (err: any) {
       console.error("SignIn exception:", err);
-      setErrorMsg("An unexpected error occurred. Please try again.");
+      setErrorMsg("Sign in failed because of a connection problem. Try again in a moment.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="login-form-container">
-      <h1 className="login-title">Welcome back</h1>
-      <p className="login-subtitle">
-        Sign in with your college email and password.
-      </p>
+    <div className="auth-card">
+      <h1>Sign in</h1>
+      <p className="auth-sub">Use your college email and password.</p>
 
       {errorMsg && (
-        <div style={{
-          backgroundColor: "#fef2f2",
-          color: "#991b1b",
-          padding: "0.75rem 1rem",
-          borderRadius: "8px",
-          marginBottom: "1rem",
-          fontSize: "0.875rem",
-          border: "1px solid #fecaca"
-        }}>
+        <div className="auth-error" role="alert">
           {errorMsg}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="login-form">
-        <div className="input-group">
-          <label htmlFor="email" className="input-label">COLLEGE EMAIL</label>
+      <form onSubmit={handleSubmit} noValidate={false}>
+        <div className="auth-field">
+          <label htmlFor="email">College email</label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@veltechmultitech.org"
-            className="premium-input"
+            placeholder="name@veltechmultitech.org"
+            className="auth-input"
             required
             autoComplete="email"
+            autoFocus
           />
         </div>
 
-        <div className="input-group">
-          <label htmlFor="password" className="input-label">PASSWORD</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="premium-input"
-            required
-            autoComplete="current-password"
-          />
+        <div className="auth-field">
+          <label htmlFor="password">Password</label>
+          <div className="auth-input-wrap">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="auth-input has-toggle"
+              required
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="auth-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
         </div>
 
-        <button 
-          type="submit" 
-          className={`btn-primary full-width ${isLoading ? "loading" : ""}`}
-          disabled={isLoading}
-        >
-          {isLoading ? "Authenticating..." : "Sign in to Dashboard"}
+        <button type="submit" className="auth-submit" disabled={isLoading}>
+          {isLoading && <span className="auth-spinner" aria-hidden="true" />}
+          {isLoading ? "Signing in" : "Sign in"}
         </button>
       </form>
+
+      <p className="auth-help">Forgot your password? Ask your department admin to reset it.</p>
     </div>
   );
 }

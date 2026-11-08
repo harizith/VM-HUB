@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getDayOrderInfo } from "@/utils/dayOrder";
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function POST() {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     // 1. Get Day Order info
     const dayOrderInfo = await getDayOrderInfo();

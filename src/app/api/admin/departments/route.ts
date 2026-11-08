@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin, requireSession } from '@/lib/adminAuth';
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // GET /api/admin/departments - Fetch departments
 export async function GET() {
+  const auth = await requireSession();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const departments = await prisma.department.findMany({
       orderBy: { code: "asc" },
@@ -20,6 +25,10 @@ export async function GET() {
 
 // POST /api/admin/departments - Create new department
 export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await req.json();
     const { code, name, hodName, hodVmNo } = body;
@@ -141,6 +150,10 @@ export async function POST(req: Request) {
 
 // DELETE /api/admin/departments - Delete department
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const deptId = searchParams.get("id"); 

@@ -1,4 +1,3 @@
-import Clock from "@/components/Clock";
 import LoginForm from "@/components/LoginForm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -18,29 +17,54 @@ export default async function Home() {
       redirect("/student");
     }
   }
-  return (
-    <div className="login-page-container">
-      {/* Left Pane - Branding & Clock */}
-      <div className="login-left-pane">
-        <div className="left-pane-content">
-          <p className="portal-label">DEPARTMENT PORTAL</p>
-          <h1 className="brand-title">Period.</h1>
-          
-          <div className="clock-wrapper">
-            <Clock />
-          </div>
-          
-          <div className="bottom-text">
-            <p>Welcome to VM-HUB.</p>
-            <p>Your academic life, organized.</p>
-          </div>
-        </div>
-      </div>
+  // A deterministic sample week: 0 = free period, 1 = class, 2 = lab, 3 = tutorial
+  const week = [
+    [1, 1, 0, 2, 2, 1],
+    [1, 3, 1, 1, 0, 0],
+    [2, 2, 1, 0, 1, 3],
+    [1, 0, 1, 1, 3, 1],
+    [3, 1, 1, 2, 2, 0],
+  ];
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
-      {/* Right Pane - Login Form */}
-      <div className="login-right-pane">
+  return (
+    <div className="auth">
+      <section className="auth-hero" aria-label="About VM-HUB">
+        <div className="auth-brand">
+          <span className="shell-logo" aria-hidden="true">VM</span>
+          VM-HUB
+        </div>
+        <h1 className="auth-headline">Your timetable, attendance and notices in one place.</h1>
+        <p className="auth-lede">
+          Sign in with your college account to see today&apos;s periods, mark attendance and read
+          announcements from your department.
+        </p>
+        <div className="auth-week" aria-hidden="true">
+          {week.map((row, d) => (
+            <div key={days[d]} style={{ display: "contents" }}>
+              <span className="auth-week-label">{days[d]}</span>
+              {row.map((kind, p) => {
+                const index = d * 6 + p;
+                const cls =
+                  kind === 0
+                    ? "auth-week-cell"
+                    : `auth-week-cell filled${kind === 2 ? " alt" : kind === 3 ? " soft" : ""}`;
+                return (
+                  <span
+                    key={p}
+                    className={cls}
+                    style={{ ["--i" as string]: index } as React.CSSProperties}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="auth-panel">
         <LoginForm />
-      </div>
+      </section>
     </div>
   );
 }

@@ -11,6 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
     }
 
+    // Only staff may mark attendance; students must not be able to alter records
+    const role = String((session.user as any).role || "").toUpperCase();
+    if (!["TEACHER", "FACULTY", "STAFF", "HOD", "ADMIN"].includes(role)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
 
     const email = session.user.email;

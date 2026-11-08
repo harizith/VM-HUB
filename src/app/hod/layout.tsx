@@ -1,22 +1,15 @@
 "use client";
 
+import { Home, Users, BookOpen, Briefcase, Bell } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Calendar, Users, LogOut, Sun, Moon, BookOpen, Briefcase, Bell } from "lucide-react";
-import { signOut } from "next-auth/react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 export default function HodLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [hodInfo, setHodInfo] = useState<any>(null);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     fetch("/api/hod/dashboard")
       .then((r) => r.json())
       .then((res) => {
@@ -28,264 +21,25 @@ export default function HodLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { href: "/hod", label: "Executive Dashboard", Icon: Home },
-    { href: "/hod/department", label: "Department Overview", Icon: Briefcase },
-    { href: "/hod/courses", label: "Department Courses", Icon: BookOpen },
-    { href: "/hod/faculty", label: "Faculty Directory", Icon: Users },
+    { href: "/hod", label: "Executive Dashboard", shortLabel: "Dashboard", Icon: Home },
+    { href: "/hod/department", label: "Department Overview", shortLabel: "Department", Icon: Briefcase },
+    { href: "/hod/courses", label: "Department Courses", shortLabel: "Courses", Icon: BookOpen },
+    { href: "/hod/faculty", label: "Faculty Directory", shortLabel: "Faculty", Icon: Users },
     { href: "/hod/notices", label: "Announcements", Icon: Bell },
   ];
 
 
   return (
-    <div className="admin-layout">
-      {/* MOBILE SIDEBAR OVERLAY */}
-      <div
-        className={`admin-sidebar-overlay ${isMobileSidebarOpen ? "open" : ""}`}
-        onClick={() => setIsMobileSidebarOpen(false)}
-      />
-
-      {/* LEFT SIDEBAR (Matching Admin Mode) */}
-      <aside className={`admin-sidebar ${isMobileSidebarOpen ? "open" : ""}`}>
-        <div>
-          {/* Brand Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              paddingBottom: "1.5rem",
-              borderBottom: "1px solid var(--border-subtle)",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "6px",
-                backgroundColor: "var(--royal-blue)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "800",
-                fontSize: "1.05rem",
-                color: "white",
-                boxShadow: "0 2px 6px rgba(10, 102, 194, 0.3)",
-              }}
-            >
-              in
-            </div>
-            <div>
-              <h2
-                style={{
-                  fontSize: "1.05rem",
-                  fontWeight: "700",
-                  margin: 0,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                VM-HUB
-              </h2>
-              <span style={{ fontSize: "0.725rem", color: "var(--royal-blue)", fontWeight: "600" }}>
-                HOD Leadership Portal
-              </span>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            {navItems.map((nav) => {
-              const isActive = pathname === nav.href;
-              return (
-                <Link
-                  key={nav.href}
-                  href={nav.href}
-                  onClick={() => setIsMobileSidebarOpen(false)}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%",
-                    padding: "0.65rem 0.9rem",
-                    borderRadius: "6px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: isActive ? "700" : "600",
-                    fontSize: "0.85rem",
-                    backgroundColor: isActive ? "rgba(10, 102, 194, 0.1)" : "transparent",
-                    color: isActive ? "var(--royal-blue)" : "var(--text-muted)",
-                    borderLeft: isActive ? "3px solid var(--royal-blue)" : "3px solid transparent",
-                    transition: "all 0.2s ease",
-                    textDecoration: "none",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                    <nav.Icon size={17} style={{ color: isActive ? "var(--royal-blue)" : "inherit" }} /> {nav.label}
-                  </span>
-                  {isActive && (
-                    <span
-                      style={{
-                        width: "6px",
-                        height: "6px",
-                        borderRadius: "50%",
-                        backgroundColor: "var(--royal-blue)",
-                      }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Card */}
-        <div
-          style={{
-            paddingTop: "1rem",
-            borderTop: "1px solid var(--border-subtle)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
-          }}
-        >
-          {/* User Profile Card (Click to open Drawer) */}
-          <div
-            onClick={() => setShowProfileDrawer(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              padding: "0.6rem 0.75rem",
-              borderRadius: "10px",
-              backgroundColor: "var(--bg-input)",
-              border: "1px solid var(--border-subtle)",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--sky-blue)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--border-subtle)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "50%",
-                backgroundColor: "var(--royal-blue)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "700",
-                color: "white",
-                fontSize: "0.95rem",
-                border: "2px solid rgba(255, 255, 255, 0.2)",
-              }}
-            >
-              {hodInfo?.name ? hodInfo.name.charAt(0) : "H"}
-            </div>
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <div
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: "600",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  color: "var(--text-main)",
-                }}
-              >
-                {hodInfo?.name || "HOD Profile"}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.725rem",
-                  color: "var(--text-muted)",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {hodInfo?.department ? `HOD, Dept of ${hodInfo.department}` : "Department Head"}
-              </div>
-            </div>
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>›</span>
-          </div>
-
-          {/* Theme Switcher */}
-          {mounted && (
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                width: "100%",
-                backgroundColor: "var(--bg-input)",
-                color: "var(--text-main)",
-                border: "1px solid var(--border-subtle)",
-                padding: "0.6rem",
-                borderRadius: "8px",
-                fontSize: "0.85rem",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              {theme === "dark" ? (
-                <>
-                  <Sun size={16} /> Light Mode
-                </>
-              ) : (
-                <>
-                  <Moon size={16} /> Dark Mode
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Sign Out */}
-          <button
-            onClick={() => signOut({ callbackUrl: "/" })}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-              color: "#ef4444",
-              fontSize: "0.85rem",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              padding: "0.6rem",
-              borderRadius: "8px",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTAINER */}
-      <div className="admin-main">
-        {/* TOP BAR WITH HAMBURGER BUTTON (Mobile Friendly) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-          <button
-            className="hamburger-btn"
-            onClick={() => setIsMobileSidebarOpen(true)}
-            style={{ display: "flex" }}
-          >
-            ☰
-          </button>
-        </div>
-
+    <>
+      <AppShell
+        portalLabel="HOD Portal"
+        navItems={navItems}
+        userName={hodInfo?.name}
+        userSubtitle={hodInfo?.department ? `HOD, Dept of ${hodInfo.department}` : "Department Head"}
+        onProfileClick={() => setShowProfileDrawer(true)}
+      >
         {children}
-      </div>
+      </AppShell>
 
       {/* HOD PROFILE SIDE DRAWER (Same as Admin User Drawer) */}
       {showProfileDrawer && (
@@ -454,6 +208,6 @@ export default function HodLayout({ children }: { children: React.ReactNode }) {
           </aside>
         </div>
       )}
-    </div>
+    </>
   );
 }

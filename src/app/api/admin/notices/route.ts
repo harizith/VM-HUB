@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // GET /api/admin/notices
 export async function GET() {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const notices = await prisma.notice.findMany({
       orderBy: { createdAt: "desc" },
@@ -36,6 +41,10 @@ export async function GET() {
 
 // POST /api/admin/notices
 export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await req.json();
     const { title, content, category, audience, department } = body;
@@ -66,6 +75,10 @@ export async function POST(req: Request) {
 
 // DELETE /api/admin/notices
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");

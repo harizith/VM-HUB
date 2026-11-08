@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin, requireSession } from '@/lib/adminAuth';
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // GET /api/admin/subjects
 export async function GET(req: Request) {
+  const auth = await requireSession();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const departmentFilter = searchParams.get("department");
@@ -139,6 +144,10 @@ export async function GET(req: Request) {
 
 // POST /api/admin/subjects
 export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await req.json();
     const { code, name, credits, semester, departmentCode } = body;
@@ -198,6 +207,10 @@ export async function POST(req: Request) {
 
 // PUT /api/admin/subjects (Update subject)
 export async function PUT(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await req.json();
     const { id, code, name, credits, semester, departmentCode } = body;
@@ -259,6 +272,10 @@ export async function PUT(req: Request) {
 
 // DELETE /api/admin/subjects
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id"); 

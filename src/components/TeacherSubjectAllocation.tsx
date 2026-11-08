@@ -302,6 +302,9 @@ export default function TeacherSubjectAllocation({
     }
   }, [computedClassId]);
 
+  // Scope filter: "SEMESTER" (default for target class), "ALL_CATALOG" (every course catalog subject), or specific semester "1".."8"
+  const [semesterFilter, setSemesterFilter] = useState<string>("SEMESTER");
+
   // When initialTargetCourse changes, auto-switch to its department and semester
   useEffect(() => {
     if (initialTargetCourse) {
@@ -328,9 +331,6 @@ export default function TeacherSubjectAllocation({
       }, 500);
     }
   }, [initialTargetCourse]);
-
-  // Scope filter: "SEMESTER" (default for target class), "ALL_CATALOG" (every course catalog subject), or specific semester "1".."8"
-  const [semesterFilter, setSemesterFilter] = useState<string>("SEMESTER");
 
   // Filter subjects based on scope, department, semester, search, and lab/theory
   const relevantSubjects = useMemo(() => {
